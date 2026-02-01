@@ -24,6 +24,7 @@ from werkzeug.utils import secure_filename
 
 # Import the G4X modules
 from g4x_3d_reconstruction import G4X3DReconstructor, SectionData
+from scipy.spatial import cKDTree
 from g4x_3d_visualization import (
     plot_transcripts_3d,
     plot_cells_3d,
@@ -31,6 +32,246 @@ from g4x_3d_visualization import (
     plot_gene_expression_3d,
     plot_niche_distribution
 )
+
+
+# ============================================================
+# Neighborhood Analysis Functions
+# ============================================================
+
+def analyze_cell_neighborhoods(
+    cells_df: pd.DataFrame,
+    cell_type_col: str = 'niche_3d',
+    radius: float = 100.0,
+    k_neighbors: int = 15
+) -> Dict:
+    """
+    Analyze cell neighborhoods and compute proximity statistics.
+
+    Returns dict with:
+    - neighbors: list of neighbor indices for each cell
+    - neighbor_types: composition of neighbor cell types
+    - proximity_matrix: cell type co-localization matrix
+    """
+    coords = cells_df[['cell_x', 'cell_y', 'cell_z']].values
+
+    # Build KD-tree for efficient neighbor search
+    tree = cKDTree(coords)
+
+    # Find neighbors within radius
+    neighbors_within_radius = tree.query_ball_tree(tree, r=radius)
+
+    # Also get k-nearest neighbors
+    distances, knn_indices = tree.query(coords, k=min(k_neighbors + 1, len(coords)))
+
+    # Get cell types
+    if cell_type_col in cells_df.columns:
+        cell_types = cells_df[cell_type_col].values
+        unique_types = sorted(cells_df[cell_type_col].unique())
+        n_types = len(unique_types)
+        type_to_idx = {t: i for i, t in enumerate(unique_types)}
+
+        # Compute proximity matrix (co-localization scores)
+        proximity_matrix = np.zeros((n_types, n_types))
+        type_counts = np.zeros(n_types)
+
+        for i, neighbors in enumerate(neighbors_within_radius):
+            cell_type = cell_types[i]
+            type_idx = type_to_idx[cell_type]
+            type_counts[type_idx] += 1
+
+            for j in neighbors:
+                if i != j:
+                    neighbor_type = cell_types[j]
+                    neighbor_idx = type_to_idx[neighbor_type]
+                    proximity_matrix[type_idx, neighbor_idx] += 1
+
+        # Normalize by cell type counts
+        for i in range(n_types):
+            if type_counts[i] > 0:
+                proximity_matrix[i, :] /= type_counts[i]
+
+        # Compute neighbor composition for each cell
+        neighbor_compositions = []
+        for i, neighbors in enumerate(knn_indices):
+            composition = np.zeros(n_types)
+            for j in neighbors[1:]:  # Skip self
+                if j < len(cell_types):
+                    neighbor_type = cell_types[j]
+                    composition[type_to_idx[neighbor_type]] += 1
+            composition /= (len(neighbors) - 1) if len(neighbors) > 1 else 1
+            neighbor_compositions.append(composition)
+
+        return {
+            'neighbors_radius': neighbors_within_radius,
+            'knn_indices': knn_indices.tolist(),
+            'knn_distances': distances.tolist(),
+            'proximity_matrix': proximity_matrix.tolist(),
+            'cell_types': unique_types,
+            'type_counts': type_counts.tolist(),
+            'neighbor_compositions': neighbor_compositions
+        }
+    else:
+        return {
+            'neighbors_radius': neighbors_within_radius,
+            'knn_indices': knn_indices.tolist(),
+            'knn_distances': distances.tolist(),
+            'cell_types': [],
+            'proximity_matrix': []
+        }
+
+
+def get_cell_connectivity_edges(
+    cells_df: pd.DataFrame,
+    max_distance: float = 75.0,
+    max_edges: int = 5000,
+    cell_type_col: str = 'niche_3d',
+    filter_same_type: bool = False,
+    filter_different_type: bool = False
+) -> Dict:
+    """
+    Get edges between neighboring cells for 3D visualization.
+
+    Returns dict with edge coordinates for Plotly line traces.
+    """
+    coords = cells_df[['cell_x', 'cell_y', 'cell_z']].values
+    n_cells = len(coords)
+
+    # Build KD-tree
+    tree = cKDTree(coords)
+
+    # Find all pairs within distance
+    pairs = tree.query_pairs(r=max_distance, output_type='ndarray')
+
+    if len(pairs) == 0:
+        return {'edges': [], 'edge_types': []}
+
+    # Filter by cell type if requested
+    if cell_type_col in cells_df.columns and (filter_same_type or filter_different_type):
+        cell_types = cells_df[cell_type_col].values
+        filtered_pairs = []
+        for i, j in pairs:
+            same_type = cell_types[i] == cell_types[j]
+            if filter_same_type and same_type:
+                filtered_pairs.append((i, j))
+            elif filter_different_type and not same_type:
+                filtered_pairs.append((i, j))
+            elif not filter_same_type and not filter_different_type:
+                filtered_pairs.append((i, j))
+        pairs = np.array(filtered_pairs) if filtered_pairs else np.array([]).reshape(0, 2)
+
+    # Subsample if too many edges
+    if len(pairs) > max_edges:
+        indices = np.random.choice(len(pairs), max_edges, replace=False)
+        pairs = pairs[indices]
+
+    # Build edge coordinates for Plotly
+    edges_x = []
+    edges_y = []
+    edges_z = []
+    edge_colors = []
+
+    cell_types = cells_df[cell_type_col].values if cell_type_col in cells_df.columns else None
+
+    for i, j in pairs:
+        edges_x.extend([coords[i, 0], coords[j, 0], None])
+        edges_y.extend([coords[i, 1], coords[j, 1], None])
+        edges_z.extend([coords[i, 2], coords[j, 2], None])
+
+        if cell_types is not None:
+            # Color based on whether same or different type
+            if cell_types[i] == cell_types[j]:
+                edge_colors.append('same')
+            else:
+                edge_colors.append('different')
+
+    return {
+        'edges_x': edges_x,
+        'edges_y': edges_y,
+        'edges_z': edges_z,
+        'edge_colors': edge_colors,
+        'n_edges': len(pairs),
+        'n_same_type': edge_colors.count('same') if edge_colors else 0,
+        'n_different_type': edge_colors.count('different') if edge_colors else 0
+    }
+
+
+def compute_spatial_enrichment(
+    cells_df: pd.DataFrame,
+    cell_type_col: str = 'niche_3d',
+    radius: float = 100.0,
+    n_permutations: int = 100
+) -> Dict:
+    """
+    Compute spatial enrichment/depletion of cell type pairs.
+    Uses permutation testing to assess significance.
+    """
+    coords = cells_df[['cell_x', 'cell_y', 'cell_z']].values
+
+    if cell_type_col not in cells_df.columns:
+        return {'error': 'Cell type column not found'}
+
+    cell_types = cells_df[cell_type_col].values
+    unique_types = sorted(cells_df[cell_type_col].unique())
+    n_types = len(unique_types)
+    type_to_idx = {t: i for i, t in enumerate(unique_types)}
+
+    # Build KD-tree
+    tree = cKDTree(coords)
+
+    # Compute observed co-localization
+    observed = np.zeros((n_types, n_types))
+    neighbors = tree.query_ball_tree(tree, r=radius)
+
+    for i, neighs in enumerate(neighbors):
+        type_i = type_to_idx[cell_types[i]]
+        for j in neighs:
+            if i != j:
+                type_j = type_to_idx[cell_types[j]]
+                observed[type_i, type_j] += 1
+
+    # Permutation test
+    permuted_means = np.zeros((n_types, n_types))
+    permuted_stds = np.zeros((n_types, n_types))
+
+    permuted_results = []
+    for _ in range(n_permutations):
+        shuffled_types = np.random.permutation(cell_types)
+        perm_matrix = np.zeros((n_types, n_types))
+
+        for i, neighs in enumerate(neighbors):
+            type_i = type_to_idx[shuffled_types[i]]
+            for j in neighs:
+                if i != j:
+                    type_j = type_to_idx[shuffled_types[j]]
+                    perm_matrix[type_i, type_j] += 1
+
+        permuted_results.append(perm_matrix)
+
+    permuted_stack = np.stack(permuted_results)
+    permuted_means = permuted_stack.mean(axis=0)
+    permuted_stds = permuted_stack.std(axis=0) + 1e-6
+
+    # Compute z-scores (enrichment/depletion)
+    z_scores = (observed - permuted_means) / permuted_stds
+
+    # Compute p-values
+    p_values = np.zeros((n_types, n_types))
+    for i in range(n_types):
+        for j in range(n_types):
+            # Two-tailed test
+            count_extreme = np.sum(np.abs(permuted_stack[:, i, j] - permuted_means[i, j]) >=
+                                   np.abs(observed[i, j] - permuted_means[i, j]))
+            p_values[i, j] = (count_extreme + 1) / (n_permutations + 1)
+
+    return {
+        'cell_types': unique_types,
+        'observed': observed.tolist(),
+        'expected': permuted_means.tolist(),
+        'z_scores': z_scores.tolist(),
+        'p_values': p_values.tolist(),
+        'enriched': (z_scores > 2).tolist(),  # Significantly enriched
+        'depleted': (z_scores < -2).tolist()  # Significantly depleted
+    }
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max upload
@@ -457,6 +698,356 @@ def get_data(session_id: str, data_type: str):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/session/<session_id>/neighborhood/analysis')
+def get_neighborhood_analysis(session_id: str):
+    """
+    Analyze cell neighborhoods and return proximity statistics.
+    """
+    session = get_session(session_id)
+
+    if session['reconstructor'] is None:
+        return jsonify({'error': 'No data processed yet'}), 400
+
+    reconstructor = session['reconstructor']
+
+    if reconstructor.cells_3d is None:
+        return jsonify({'error': 'No cell data available'}), 400
+
+    try:
+        radius = float(request.args.get('radius', 100.0))
+        k_neighbors = int(request.args.get('k_neighbors', 15))
+        cell_type_col = request.args.get('cell_type_col', 'niche_3d')
+
+        # Fall back to section_index if niche_3d not available
+        if cell_type_col not in reconstructor.cells_3d.columns:
+            cell_type_col = 'section_index'
+
+        analysis = analyze_cell_neighborhoods(
+            reconstructor.cells_3d,
+            cell_type_col=cell_type_col,
+            radius=radius,
+            k_neighbors=k_neighbors
+        )
+
+        return jsonify(analysis)
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/session/<session_id>/neighborhood/connectivity')
+def get_neighborhood_connectivity(session_id: str):
+    """
+    Get cell connectivity edges for 3D visualization.
+    """
+    session = get_session(session_id)
+
+    if session['reconstructor'] is None:
+        return jsonify({'error': 'No data processed yet'}), 400
+
+    reconstructor = session['reconstructor']
+
+    if reconstructor.cells_3d is None:
+        return jsonify({'error': 'No cell data available'}), 400
+
+    try:
+        max_distance = float(request.args.get('max_distance', 75.0))
+        max_edges = int(request.args.get('max_edges', 5000))
+        cell_type_col = request.args.get('cell_type_col', 'niche_3d')
+        filter_same = request.args.get('filter_same', 'false').lower() == 'true'
+        filter_different = request.args.get('filter_different', 'false').lower() == 'true'
+
+        if cell_type_col not in reconstructor.cells_3d.columns:
+            cell_type_col = 'section_index'
+
+        edges = get_cell_connectivity_edges(
+            reconstructor.cells_3d,
+            max_distance=max_distance,
+            max_edges=max_edges,
+            cell_type_col=cell_type_col,
+            filter_same_type=filter_same,
+            filter_different_type=filter_different
+        )
+
+        return jsonify(edges)
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/session/<session_id>/neighborhood/enrichment')
+def get_spatial_enrichment(session_id: str):
+    """
+    Compute spatial enrichment analysis between cell types.
+    """
+    session = get_session(session_id)
+
+    if session['reconstructor'] is None:
+        return jsonify({'error': 'No data processed yet'}), 400
+
+    reconstructor = session['reconstructor']
+
+    if reconstructor.cells_3d is None:
+        return jsonify({'error': 'No cell data available'}), 400
+
+    try:
+        radius = float(request.args.get('radius', 100.0))
+        n_permutations = int(request.args.get('n_permutations', 50))
+        cell_type_col = request.args.get('cell_type_col', 'niche_3d')
+
+        if cell_type_col not in reconstructor.cells_3d.columns:
+            cell_type_col = 'section_index'
+
+        enrichment = compute_spatial_enrichment(
+            reconstructor.cells_3d,
+            cell_type_col=cell_type_col,
+            radius=radius,
+            n_permutations=n_permutations
+        )
+
+        return jsonify(enrichment)
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/session/<session_id>/visualization/neighborhood')
+def get_neighborhood_visualization(session_id: str):
+    """
+    Get combined neighborhood visualization with cells and connections.
+    """
+    session = get_session(session_id)
+
+    if session['reconstructor'] is None:
+        return jsonify({'error': 'No data processed yet'}), 400
+
+    reconstructor = session['reconstructor']
+
+    if reconstructor.cells_3d is None:
+        return jsonify({'error': 'No cell data available'}), 400
+
+    try:
+        import plotly.graph_objects as go
+
+        max_distance = float(request.args.get('max_distance', 75.0))
+        max_edges = int(request.args.get('max_edges', 3000))
+        max_cells = int(request.args.get('max_cells', 2000))
+        cell_type_col = request.args.get('cell_type_col', 'niche_3d')
+        show_edges = request.args.get('show_edges', 'true').lower() == 'true'
+        edge_filter = request.args.get('edge_filter', 'all')  # 'all', 'same', 'different'
+
+        if cell_type_col not in reconstructor.cells_3d.columns:
+            cell_type_col = 'section_index'
+
+        cells_df = reconstructor.cells_3d
+        if len(cells_df) > max_cells:
+            cells_df = cells_df.sample(n=max_cells, random_state=42)
+
+        # Get cell types
+        cell_types = cells_df[cell_type_col].values
+        unique_types = sorted(cells_df[cell_type_col].unique())
+
+        # Color palette
+        colors = [
+            '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
+            '#f43f5e', '#f97316', '#eab308', '#22c55e', '#14b8a6',
+            '#06b6d4', '#3b82f6'
+        ]
+
+        traces = []
+
+        # Add cell scatter traces by type
+        for i, cell_type in enumerate(unique_types):
+            mask = cell_types == cell_type
+            type_cells = cells_df[mask]
+
+            traces.append(go.Scatter3d(
+                x=type_cells['cell_x'].values,
+                y=type_cells['cell_y'].values,
+                z=type_cells['cell_z'].values,
+                mode='markers',
+                marker=dict(
+                    size=6,
+                    color=colors[i % len(colors)],
+                    opacity=0.8,
+                    line=dict(width=1, color='white')
+                ),
+                name=f'Type {cell_type}',
+                hovertemplate=f'Type {cell_type}<br>X: %{{x:.0f}}<br>Y: %{{y:.0f}}<br>Z: %{{z:.1f}}<extra></extra>'
+            ))
+
+        # Add connectivity edges
+        if show_edges:
+            filter_same = edge_filter == 'same'
+            filter_different = edge_filter == 'different'
+
+            edges = get_cell_connectivity_edges(
+                cells_df,
+                max_distance=max_distance,
+                max_edges=max_edges,
+                cell_type_col=cell_type_col,
+                filter_same_type=filter_same,
+                filter_different_type=filter_different
+            )
+
+            if edges['edges_x']:
+                # Separate edges by type
+                same_x, same_y, same_z = [], [], []
+                diff_x, diff_y, diff_z = [], [], []
+
+                edge_colors = edges.get('edge_colors', [])
+                for idx in range(0, len(edges['edges_x']), 3):
+                    if idx // 3 < len(edge_colors):
+                        if edge_colors[idx // 3] == 'same':
+                            same_x.extend(edges['edges_x'][idx:idx+3])
+                            same_y.extend(edges['edges_y'][idx:idx+3])
+                            same_z.extend(edges['edges_z'][idx:idx+3])
+                        else:
+                            diff_x.extend(edges['edges_x'][idx:idx+3])
+                            diff_y.extend(edges['edges_y'][idx:idx+3])
+                            diff_z.extend(edges['edges_z'][idx:idx+3])
+                    else:
+                        same_x.extend(edges['edges_x'][idx:idx+3])
+                        same_y.extend(edges['edges_y'][idx:idx+3])
+                        same_z.extend(edges['edges_z'][idx:idx+3])
+
+                # Same-type edges (cyan)
+                if same_x and edge_filter != 'different':
+                    traces.append(go.Scatter3d(
+                        x=same_x,
+                        y=same_y,
+                        z=same_z,
+                        mode='lines',
+                        line=dict(color='rgba(6, 182, 212, 0.4)', width=1),
+                        name=f'Same-type ({edges["n_same_type"]})',
+                        hoverinfo='skip'
+                    ))
+
+                # Different-type edges (pink)
+                if diff_x and edge_filter != 'same':
+                    traces.append(go.Scatter3d(
+                        x=diff_x,
+                        y=diff_y,
+                        z=diff_z,
+                        mode='lines',
+                        line=dict(color='rgba(236, 72, 153, 0.5)', width=1.5),
+                        name=f'Cross-type ({edges["n_different_type"]})',
+                        hoverinfo='skip'
+                    ))
+
+        # Layout
+        layout = go.Layout(
+            title=dict(
+                text='3D Cell Neighborhood Network',
+                font=dict(size=16)
+            ),
+            scene=dict(
+                xaxis=dict(title='X (pixels)'),
+                yaxis=dict(title='Y (pixels)'),
+                zaxis=dict(title='Z (um)'),
+                aspectmode='data'
+            ),
+            legend=dict(
+                yanchor='top',
+                y=0.99,
+                xanchor='left',
+                x=0.01
+            ),
+            margin=dict(l=0, r=0, t=40, b=0)
+        )
+
+        fig = go.Figure(data=traces, layout=layout)
+        return jsonify(json.loads(fig.to_json()))
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/session/<session_id>/visualization/proximity_matrix')
+def get_proximity_matrix_viz(session_id: str):
+    """
+    Get proximity matrix heatmap visualization.
+    """
+    session = get_session(session_id)
+
+    if session['reconstructor'] is None:
+        return jsonify({'error': 'No data processed yet'}), 400
+
+    reconstructor = session['reconstructor']
+
+    if reconstructor.cells_3d is None:
+        return jsonify({'error': 'No cell data available'}), 400
+
+    try:
+        import plotly.graph_objects as go
+
+        radius = float(request.args.get('radius', 100.0))
+        cell_type_col = request.args.get('cell_type_col', 'niche_3d')
+        show_enrichment = request.args.get('show_enrichment', 'false').lower() == 'true'
+
+        if cell_type_col not in reconstructor.cells_3d.columns:
+            cell_type_col = 'section_index'
+
+        if show_enrichment:
+            # Use enrichment z-scores
+            enrichment = compute_spatial_enrichment(
+                reconstructor.cells_3d,
+                cell_type_col=cell_type_col,
+                radius=radius,
+                n_permutations=50
+            )
+            matrix = np.array(enrichment['z_scores'])
+            cell_types = enrichment['cell_types']
+            title = 'Spatial Enrichment (Z-scores)'
+            colorscale = 'RdBu_r'
+            zmid = 0
+        else:
+            # Use raw proximity counts
+            analysis = analyze_cell_neighborhoods(
+                reconstructor.cells_3d,
+                cell_type_col=cell_type_col,
+                radius=radius
+            )
+            matrix = np.array(analysis['proximity_matrix'])
+            cell_types = analysis['cell_types']
+            title = 'Cell Type Proximity Matrix'
+            colorscale = 'Viridis'
+            zmid = None
+
+        # Create heatmap
+        labels = [f'Type {t}' for t in cell_types]
+
+        fig = go.Figure(data=go.Heatmap(
+            z=matrix,
+            x=labels,
+            y=labels,
+            colorscale=colorscale,
+            zmid=zmid,
+            text=np.round(matrix, 2),
+            texttemplate='%{text}',
+            textfont=dict(size=10),
+            hovertemplate='%{y} -> %{x}<br>Value: %{z:.2f}<extra></extra>'
+        ))
+
+        fig.update_layout(
+            title=dict(text=title, font=dict(size=16)),
+            xaxis=dict(title='Neighbor Type', tickangle=45),
+            yaxis=dict(title='Cell Type'),
+            height=500,
+            margin=dict(l=100, r=20, t=60, b=100)
+        )
+
+        return jsonify(json.loads(fig.to_json()))
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/session/<session_id>/export/<format>')
 def export_data(session_id: str, format: str):
     """Export processed data in various formats."""
@@ -553,6 +1144,27 @@ def load_demo_data(session_id: str):
             cell_x = center_x + cell_radii * np.cos(cell_angles)
             cell_y = center_y + cell_radii * np.sin(cell_angles)
 
+            # Create spatially structured cell types for interesting neighborhood analysis
+            # Cells near center are one type, outer ring another, with some mixing
+            cell_types = []
+            for cx, cy in zip(cell_x, cell_y):
+                dist_from_center = np.sqrt((cx - center_x)**2 + (cy - center_y)**2)
+                angle = np.arctan2(cy - center_y, cx - center_x)
+
+                # Create spatial structure
+                if dist_from_center < radius * 0.3:
+                    # Inner core - mostly tumor cells
+                    cell_types.append(np.random.choice([0, 1], p=[0.8, 0.2]))
+                elif dist_from_center < radius * 0.6:
+                    # Middle zone - mixed immune infiltration
+                    cell_types.append(np.random.choice([1, 2, 3], p=[0.3, 0.4, 0.3]))
+                else:
+                    # Outer zone - stromal and immune
+                    if angle > 0:
+                        cell_types.append(np.random.choice([3, 4, 5], p=[0.4, 0.3, 0.3]))
+                    else:
+                        cell_types.append(np.random.choice([4, 5, 6], p=[0.3, 0.4, 0.3]))
+
             cells = pd.DataFrame({
                 'label': range(n_cells_per_section),
                 'cell_x': cell_x,
@@ -560,13 +1172,14 @@ def load_demo_data(session_id: str):
                 'total_counts': np.random.poisson(50, n_cells_per_section),
                 'n_genes_by_counts': np.random.poisson(20, n_cells_per_section),
                 'nuclei_area': np.random.uniform(100, 500, n_cells_per_section),
-                'nuclei_expanded_area': np.random.uniform(200, 800, n_cells_per_section)
+                'nuclei_expanded_area': np.random.uniform(200, 800, n_cells_per_section),
+                'cell_type': cell_types  # Add explicit cell type
             })
             cells.to_csv(cell_dir / 'cell_metadata.csv.gz', index=False, compression='gzip')
 
-            # Add cluster annotations
+            # Add cluster annotations matching cell types
             clusters = pd.DataFrame({
-                'leiden_0.5': np.random.randint(0, 8, n_cells_per_section)
+                'leiden_0.5': cell_types
             })
             clusters.to_csv(cell_dir / 'clustering_umap.csv.gz', index=False, compression='gzip')
 

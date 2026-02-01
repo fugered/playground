@@ -1123,8 +1123,9 @@
                 <div class="viz-tabs" id="vizTabs">
                     <button class="viz-tab active" data-viz="transcripts_3d">3D Transcripts</button>
                     <button class="viz-tab" data-viz="cells_3d">3D Cells</button>
+                    <button class="viz-tab" data-viz="neighborhood">Neighbors</button>
+                    <button class="viz-tab" data-viz="proximity">Proximity</button>
                     <button class="viz-tab" data-viz="niches">Niches</button>
-                    <button class="viz-tab" data-viz="sections">Sections</button>
                     <button class="viz-tab" data-viz="gene">Gene</button>
                 </div>
                 <div class="viz-controls">
@@ -1185,6 +1186,32 @@
                     <div class="gene-search" id="geneSearch" style="display: none;">
                         <input type="text" id="geneInput" placeholder="Gene name (e.g., CD3E, GAPDH)">
                         <button id="btnSearchGene">Search</button>
+                    </div>
+                    <!-- Neighborhood controls -->
+                    <div class="toolbar-divider" id="neighborDivider" style="display: none;"></div>
+                    <div class="toolbar-group" id="neighborControls" style="display: none;">
+                        <label>Radius:</label>
+                        <select id="neighborRadius">
+                            <option value="50">50 px</option>
+                            <option value="75" selected>75 px</option>
+                            <option value="100">100 px</option>
+                            <option value="150">150 px</option>
+                        </select>
+                    </div>
+                    <div class="toolbar-group" id="edgeFilterGroup" style="display: none;">
+                        <label>Edges:</label>
+                        <select id="edgeFilter">
+                            <option value="all">All</option>
+                            <option value="same">Same Type</option>
+                            <option value="different">Cross-Type</option>
+                        </select>
+                    </div>
+                    <div class="toolbar-group" id="proximityControls" style="display: none;">
+                        <label>Show:</label>
+                        <select id="proximityMode">
+                            <option value="counts">Proximity Counts</option>
+                            <option value="enrichment">Enrichment (Z-score)</option>
+                        </select>
                     </div>
                 </div>
 
@@ -1527,8 +1554,20 @@
 
         function updateToolbar() {
             const isGene = currentViz === 'gene';
+            const isNeighborhood = currentViz === 'neighborhood';
+            const isProximity = currentViz === 'proximity';
+
+            // Gene search
             elements.geneSearch.style.display = isGene ? 'flex' : 'none';
             elements.geneSearchDivider.style.display = isGene ? 'block' : 'none';
+
+            // Neighborhood controls
+            document.getElementById('neighborDivider').style.display = isNeighborhood ? 'block' : 'none';
+            document.getElementById('neighborControls').style.display = isNeighborhood ? 'flex' : 'none';
+            document.getElementById('edgeFilterGroup').style.display = isNeighborhood ? 'flex' : 'none';
+
+            // Proximity controls
+            document.getElementById('proximityControls').style.display = isProximity ? 'flex' : 'none';
 
             elements.colorBy.innerHTML = '';
             if (currentViz === 'transcripts_3d') {
@@ -1553,40 +1592,59 @@
             elements.emptyState.style.display = 'none';
 
             // Show loading
+            const loadingText = vizType === 'neighborhood' ? 'Building cell network...' :
+                               vizType === 'proximity' ? 'Computing proximity matrix...' :
+                               'Rendering 3D volume...';
+
             elements.vizPlot.innerHTML = `
                 <div class="loading-container">
                     <div class="loading-orb"></div>
-                    <div class="loading-text">Rendering 3D volume...</div>
+                    <div class="loading-text">${loadingText}</div>
                 </div>
             `;
 
             try {
-                let url = `/api/session/${SESSION_ID}/visualization/${vizType}`;
+                let url;
                 const params = new URLSearchParams();
-                params.append('max_points', elements.maxPoints.value);
 
-                if (vizType === 'cells_3d') {
-                    params.append('color_by', elements.colorBy.value);
-                }
+                // Handle different visualization types
+                if (vizType === 'neighborhood') {
+                    url = `/api/session/${SESSION_ID}/visualization/neighborhood`;
+                    params.append('max_distance', document.getElementById('neighborRadius').value);
+                    params.append('max_edges', '4000');
+                    params.append('max_cells', '2000');
+                    params.append('edge_filter', document.getElementById('edgeFilter').value);
+                } else if (vizType === 'proximity') {
+                    url = `/api/session/${SESSION_ID}/visualization/proximity_matrix`;
+                    params.append('radius', document.getElementById('neighborRadius')?.value || '100');
+                    params.append('show_enrichment', document.getElementById('proximityMode')?.value === 'enrichment' ? 'true' : 'false');
+                } else {
+                    url = `/api/session/${SESSION_ID}/visualization/${vizType}`;
+                    params.append('max_points', elements.maxPoints.value);
 
-                if (vizType === 'gene') {
-                    const gene = elements.geneInput.value.trim();
-                    if (!gene) {
-                        elements.vizPlot.innerHTML = `
-                            <div class="empty-state">
-                                <div class="icon-container">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                        <circle cx="11" cy="11" r="8"></circle>
-                                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                                    </svg>
-                                </div>
-                                <h3>Search for a Gene</h3>
-                                <p>Enter a gene symbol (e.g., CD3E, GAPDH, EPCAM) to visualize its spatial expression pattern.</p>
-                            </div>
-                        `;
-                        return;
+                    if (vizType === 'cells_3d') {
+                        params.append('color_by', elements.colorBy.value);
                     }
-                    params.append('gene', gene);
+
+                    if (vizType === 'gene') {
+                        const gene = elements.geneInput.value.trim();
+                        if (!gene) {
+                            elements.vizPlot.innerHTML = `
+                                <div class="empty-state">
+                                    <div class="icon-container">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                            <circle cx="11" cy="11" r="8"></circle>
+                                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                        </svg>
+                                    </div>
+                                    <h3>Search for a Gene</h3>
+                                    <p>Enter a gene symbol (e.g., CD3E, GAPDH, EPCAM) to visualize its spatial expression pattern.</p>
+                                </div>
+                            `;
+                            return;
+                        }
+                        params.append('gene', gene);
+                    }
                 }
 
                 url += '?' + params.toString();
@@ -1596,7 +1654,7 @@
 
                 if (response.ok && plotData.data) {
                     currentPlotData = plotData;
-                    await renderPlot(plotData);
+                    await renderPlot(plotData, vizType);
                     updateInfoPanel(plotData);
                     updateLegend(plotData);
                 } else {
@@ -1612,8 +1670,9 @@
             }
         }
 
-        async function renderPlot(plotData) {
+        async function renderPlot(plotData, vizType = currentViz) {
             const style = elements.pointStyle.value;
+            const isHeatmap = vizType === 'proximity';
 
             // Enhance the plot data for immersive experience
             const enhancedData = plotData.data.map((trace, i) => {
@@ -1910,6 +1969,25 @@
             }
         });
 
+        // Neighborhood controls
+        document.getElementById('neighborRadius').addEventListener('change', () => {
+            if (hasData && (currentViz === 'neighborhood' || currentViz === 'proximity')) {
+                loadVisualization(currentViz);
+            }
+        });
+
+        document.getElementById('edgeFilter').addEventListener('change', () => {
+            if (hasData && currentViz === 'neighborhood') {
+                loadVisualization('neighborhood');
+            }
+        });
+
+        document.getElementById('proximityMode').addEventListener('change', () => {
+            if (hasData && currentViz === 'proximity') {
+                loadVisualization('proximity');
+            }
+        });
+
         // ============================================================
         // Export
         // ============================================================
@@ -1949,7 +2027,7 @@
                 case 'home':
                     elements.btnResetCamera.click();
                     break;
-                case '1': case '2': case '3': case '4': case '5':
+                case '1': case '2': case '3': case '4': case '5': case '6':
                     const tabs = document.querySelectorAll('.viz-tab');
                     const idx = parseInt(e.key) - 1;
                     if (tabs[idx]) tabs[idx].click();
