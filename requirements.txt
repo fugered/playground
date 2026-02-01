@@ -1,0 +1,31 @@
+# G4X 3D Reconstruction Requirements
+# ====================================
+
+# Core dependencies
+numpy>=1.21.0
+pandas>=1.3.0
+scipy>=1.7.0
+
+# File formats
+pyarrow>=8.0.0        # Parquet support
+
+# Visualization
+plotly>=5.0.0         # Interactive 3D plots
+
+# Machine learning
+scikit-learn>=1.0.0   # Clustering, dimensionality reduction
+
+# Optional: Advanced analysis
+# ---------------------------
+# Uncomment these for full functionality
+
+# scanpy>=1.9.0       # Single-cell analysis
+# anndata>=0.8.0      # AnnData format
+# napari>=0.4.0       # 3D viewer
+# tifffile>=2022.0.0  # TIFF/OME-TIFF support
+# glymur>=0.9.0       # JPEG2000 support for .jp2 files
+# h5py>=3.0.0         # HDF5 support
+
+# Jupyter support
+# jupyter>=1.0.0
+# ipywidgets>=8.0.0
