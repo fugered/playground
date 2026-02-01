@@ -58,7 +58,37 @@ pip install -r requirements.txt
 pip install scanpy anndata napari
 ```
 
-## Quick Start
+## Web Interface
+
+A browser-based interface is available for interactive data import and visualization.
+
+### Starting the Web Interface
+
+```bash
+# Simple launch (opens browser automatically)
+python run_web.py
+
+# Custom port
+python run_web.py --port 8080
+
+# Production mode (accessible from network)
+python run_web.py --host 0.0.0.0 --port 5000
+```
+
+### Web Interface Features
+
+- **File Upload**: Drag & drop CSV, Parquet, or ZIP files for each section
+- **Processing Parameters**: Configure section thickness, pixel size, alignment method
+- **Interactive 3D Visualization**: Explore transcripts and cells in 3D using Plotly
+- **Gene Expression**: Search and visualize individual gene expression patterns
+- **Niche Analysis**: View identified 3D cellular niches
+- **Export**: Download processed results in Parquet format
+
+### Demo Mode
+
+Click "Load Demo" to generate synthetic data and explore the interface without uploading real data.
+
+## Quick Start (Python API)
 
 ```python
 from g4x_3d_reconstruction import G4X3DReconstructor
@@ -269,6 +299,9 @@ y_um = y_pixels * pixel_size
 - `g4x_3d_reconstruction.py` - Main reconstruction pipeline
 - `g4x_3d_visualization.py` - Interactive visualization functions
 - `g4x_3d_reconstruction_notebook.ipynb` - Jupyter notebook tutorial
+- `app.py` - Flask web application backend
+- `run_web.py` - Web interface launcher script
+- `templates/index.html` - Web interface frontend
 - `requirements.txt` - Python dependencies
 - `README.md` - This documentation
 
