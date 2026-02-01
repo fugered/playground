@@ -15,6 +15,10 @@ plotly>=5.0.0         # Interactive 3D plots
 # Machine learning
 scikit-learn>=1.0.0   # Clustering, dimensionality reduction
 
+# Web interface
+flask>=2.3.0          # Web framework
+werkzeug>=2.3.0       # WSGI utilities
+
 # Optional: Advanced analysis
 # ---------------------------
 # Uncomment these for full functionality

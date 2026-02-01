@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G4X 3D Reconstruction - Web Interface</title>
+
+    <!-- Plotly.js for 3D visualization -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --secondary: #10b981;
+            --accent: #f59e0b;
+            --background: #f8fafc;
+            --surface: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --error: #ef4444;
+            --success: #22c55e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--background);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        header h1 span {
+            font-size: 0.75rem;
+            background: rgba(255,255,255,0.2);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 400;
+        }
+
+        /* Main Layout */
+        .container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            max-width: 1800px;
+            margin: 0 auto;
+            min-height: calc(100vh - 80px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1.25rem;
+        }
+
+        .card-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-title svg {
+            width: 18px;
+            height: 18px;
+            color: var(--primary);
+        }
+
+        /* Upload Zone */
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 2rem 1rem;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(79, 70, 229, 0.05);
+        }
+
+        .upload-zone svg {
+            width: 48px;
+            height: 48px;
+            color: var(--text-light);
+            margin-bottom: 1rem;
+        }
+
+        .upload-zone p {
+            color: var(--text-light);
+            font-size: 0.875rem;
+        }
+
+        .upload-zone .hint {
+            font-size: 0.75rem;
+            margin-top: 0.5rem;
+        }
+
+        /* File Input */
+        #fileInput {
+            display: none;
+        }
+
+        /* Section List */
+        .section-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .section-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            background: var(--background);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .section-item .name {
+            font-weight: 500;
+        }
+
+        .section-item .count {
+            color: var(--text-light);
+        }
+
+        /* Parameters Form */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+            color: var(--text);
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-group .hint {
+            font-size: 0.7rem;
+            color: var(--text-light);
+            margin-top: 0.25rem;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #059669;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .btn-outline:hover:not(:disabled) {
+            background: var(--background);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .btn-group .btn {
+            flex: 1;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 1rem;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-top: 0.5rem;
+            text-align: center;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .stat-item {
+            background: var(--background);
+            padding: 0.75rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-light);
+            margin-top: 0.25rem;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        /* Visualization Tabs */
+        .viz-tabs {
+            display: flex;
+            gap: 0.5rem;
+            padding: 1rem;
+            background: var(--surface);
+            border-radius: 12px 12px 0 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .viz-tab {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            color: var(--text-light);
+            transition: all 0.2s;
+        }
+
+        .viz-tab:hover {
+            background: var(--background);
+            color: var(--text);
+        }
+
+        .viz-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Visualization Container */
+        .viz-container {
+            background: var(--surface);
+            border-radius: 0 0 12px 12px;
+            flex: 1;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .viz-toolbar {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .viz-toolbar label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
+        .viz-toolbar select, .viz-toolbar input {
+            padding: 0.375rem 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        #vizPlot {
+            flex: 1;
+            min-height: 450px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-light);
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 1.125rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state p {
+            font-size: 0.875rem;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            padding: 1rem 1.5rem;
+            background: var(--text);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: none;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.error {
+            background: var(--error);
+        }
+
+        .toast.success {
+            background: var(--success);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            }
+        }
+
+        /* Gene search */
+        .gene-search {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .gene-search input {
+            flex: 1;
+        }
+
+        .gene-search button {
+            padding: 0.375rem 0.75rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                <line x1="12" y1="22" x2="12" y2="12"></line>
+            </svg>
+            G4X 3D Reconstruction
+            <span>Web Interface</span>
+        </h1>
+    </header>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <!-- Upload Card -->
+            <div class="card">
+                <div class="card-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    Import Data
+                </div>
+
+                <div class="upload-zone" id="uploadZone">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                        <path d="M12 12v9"></path>
+                        <path d="m16 16-4-4-4 4"></path>
+                    </svg>
+                    <p>Drag & drop files here</p>
+                    <p class="hint">or click to browse</p>
+                    <p class="hint">CSV, Parquet, or ZIP files</p>
+                </div>
+                <input type="file" id="fileInput" multiple accept=".csv,.csv.gz,.parquet,.zip">
+
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label>Section Index</label>
+                    <input type="number" id="sectionIndex" value="0" min="0" max="20">
+                    <p class="hint">Which section is this data for?</p>
+                </div>
+
+                <div class="form-group">
+                    <label>File Type</label>
+                    <select id="fileType">
+                        <option value="auto">Auto-detect</option>
+                        <option value="transcript_table">Transcript Table</option>
+                        <option value="cell_metadata">Cell Metadata</option>
+                    </select>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-outline" id="btnDemo">Load Demo</button>
+                    <button class="btn btn-outline" id="btnReset">Reset</button>
+                </div>
+            </div>
+
+            <!-- Parameters Card -->
+            <div class="card">
+                <div class="card-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    Processing Parameters
+                </div>
+
+                <div class="form-group">
+                    <label>Section Thickness (um)</label>
+                    <input type="number" id="sectionThickness" value="5.0" min="0.1" max="100" step="0.1">
+                    <p class="hint">Physical thickness of each section</p>
+                </div>
+
+                <div class="form-group">
+                    <label>Pixel Size (um)</label>
+                    <input type="number" id="pixelSize" value="0.5" min="0.01" max="10" step="0.01">
+                    <p class="hint">Physical size per pixel</p>
+                </div>
+
+                <div class="form-group">
+                    <label>Alignment Method</label>
+                    <select id="alignmentMethod">
+                        <option value="centroid">Centroid</option>
+                        <option value="icp">ICP (Iterative Closest Point)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Niche Neighbors</label>
+                    <input type="number" id="nNeighbors" value="30" min="5" max="100">
+                    <p class="hint">K-nearest neighbors for niche detection</p>
+                </div>
+
+                <button class="btn btn-primary" id="btnProcess" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    Run 3D Reconstruction
+                </button>
+
+                <div class="progress-container" id="progressContainer" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                    </div>
+                    <p class="progress-text" id="progressText">Processing...</p>
+                </div>
+            </div>
+
+            <!-- Stats Card -->
+            <div class="card" id="statsCard" style="display: none;">
+                <div class="card-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                    Results Summary
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="statSections">-</div>
+                        <div class="stat-label">Sections</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statTranscripts">-</div>
+                        <div class="stat-label">Transcripts</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statCells">-</div>
+                        <div class="stat-label">Cells</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statNiches">-</div>
+                        <div class="stat-label">Niches</div>
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary" id="btnExport" style="margin-top: 1rem;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Export Results
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Visualization Area -->
+        <main class="main-content">
+            <div class="viz-tabs" id="vizTabs">
+                <button class="viz-tab active" data-viz="transcripts_3d">3D Transcripts</button>
+                <button class="viz-tab" data-viz="cells_3d">3D Cells</button>
+                <button class="viz-tab" data-viz="niches">Niches</button>
+                <button class="viz-tab" data-viz="sections">Sections</button>
+                <button class="viz-tab" data-viz="gene">Gene Expression</button>
+            </div>
+
+            <div class="viz-container">
+                <div class="viz-toolbar" id="vizToolbar">
+                    <div>
+                        <label>Color by: </label>
+                        <select id="colorBy">
+                            <option value="section_index">Section</option>
+                            <option value="gene_name">Gene</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Max Points: </label>
+                        <select id="maxPoints">
+                            <option value="10000">10,000</option>
+                            <option value="50000" selected>50,000</option>
+                            <option value="100000">100,000</option>
+                        </select>
+                    </div>
+                    <div class="gene-search" id="geneSearch" style="display: none;">
+                        <input type="text" id="geneInput" placeholder="Enter gene name (e.g., CD3E)">
+                        <button id="btnSearchGene">Search</button>
+                    </div>
+                </div>
+
+                <div id="vizPlot">
+                    <div class="empty-state" id="emptyState">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                            <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                            <line x1="12" y1="22" x2="12" y2="12"></line>
+                        </svg>
+                        <h3>No Data to Display</h3>
+                        <p>Upload section data or load demo data to get started.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Session management
+        const SESSION_ID = '{{ session_id }}';
+        let hasData = false;
+        let currentViz = 'transcripts_3d';
+        let pollInterval = null;
+
+        // DOM Elements
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const btnDemo = document.getElementById('btnDemo');
+        const btnReset = document.getElementById('btnReset');
+        const btnProcess = document.getElementById('btnProcess');
+        const btnExport = document.getElementById('btnExport');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const statsCard = document.getElementById('statsCard');
+        const vizTabs = document.getElementById('vizTabs');
+        const vizPlot = document.getElementById('vizPlot');
+        const emptyState = document.getElementById('emptyState');
+        const toast = document.getElementById('toast');
+        const colorBy = document.getElementById('colorBy');
+        const maxPoints = document.getElementById('maxPoints');
+        const geneSearch = document.getElementById('geneSearch');
+        const geneInput = document.getElementById('geneInput');
+        const btnSearchGene = document.getElementById('btnSearchGene');
+
+        // Toast notification
+        function showToast(message, type = 'info') {
+            toast.textContent = message;
+            toast.className = 'toast show ' + type;
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
+
+        // Format number with commas
+        function formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toString();
+        }
+
+        // File upload handling
+        uploadZone.addEventListener('click', () => fileInput.click());
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileUpload(files);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files);
+            }
+        });
+
+        async function handleFileUpload(files) {
+            const formData = new FormData();
+            for (const file of files) {
+                formData.append('files', file);
+            }
+            formData.append('section_index', document.getElementById('sectionIndex').value);
+            formData.append('file_type', document.getElementById('fileType').value);
+
+            try {
+                const response = await fetch(`/api/session/${SESSION_ID}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(data.message, 'success');
+                    btnProcess.disabled = false;
+
+                    // Auto-increment section index for next upload
+                    const sectionIndexInput = document.getElementById('sectionIndex');
+                    sectionIndexInput.value = parseInt(sectionIndexInput.value) + 1;
+                } else {
+                    showToast(data.error, 'error');
+                }
+            } catch (error) {
+                showToast('Upload failed: ' + error.message, 'error');
+            }
+        }
+
+        // Demo data loading
+        btnDemo.addEventListener('click', async () => {
+            btnDemo.disabled = true;
+            progressContainer.style.display = 'block';
+            progressFill.style.width = '0%';
+            progressText.textContent = 'Generating demo data...';
+
+            try {
+                const response = await fetch(`/api/session/${SESSION_ID}/demo`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast('Demo data loaded successfully!', 'success');
+                    hasData = true;
+                    updateUI(data);
+                    loadVisualization(currentViz);
+                } else {
+                    showToast(data.error, 'error');
+                }
+            } catch (error) {
+                showToast('Failed to load demo: ' + error.message, 'error');
+            } finally {
+                btnDemo.disabled = false;
+                progressContainer.style.display = 'none';
+            }
+        });
+
+        // Reset session
+        btnReset.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to reset? All data will be cleared.')) {
+                return;
+            }
+
+            try {
+                await fetch(`/api/session/${SESSION_ID}/reset`, { method: 'POST' });
+                location.reload();
+            } catch (error) {
+                showToast('Reset failed: ' + error.message, 'error');
+            }
+        });
+
+        // Process data
+        btnProcess.addEventListener('click', async () => {
+            btnProcess.disabled = true;
+            progressContainer.style.display = 'block';
+            progressFill.style.width = '0%';
+            progressText.textContent = 'Starting processing...';
+
+            try {
+                const response = await fetch(`/api/session/${SESSION_ID}/process`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        section_thickness: parseFloat(document.getElementById('sectionThickness').value),
+                        pixel_size: parseFloat(document.getElementById('pixelSize').value),
+                        alignment_method: document.getElementById('alignmentMethod').value,
+                        n_neighbors: parseInt(document.getElementById('nNeighbors').value)
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast('Processing complete!', 'success');
+                    hasData = true;
+                    updateUI(data);
+                    loadVisualization(currentViz);
+                } else {
+                    showToast(data.error, 'error');
+                }
+            } catch (error) {
+                showToast('Processing failed: ' + error.message, 'error');
+            } finally {
+                btnProcess.disabled = false;
+                progressContainer.style.display = 'none';
+            }
+        });
+
+        // Poll for status during processing
+        async function pollStatus() {
+            try {
+                const response = await fetch(`/api/session/${SESSION_ID}/status`);
+                const status = await response.json();
+
+                progressFill.style.width = status.progress + '%';
+                progressText.textContent = status.message;
+
+                if (status.status === 'complete' || status.status === 'error') {
+                    if (pollInterval) {
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                    }
+                }
+            } catch (error) {
+                console.error('Status poll failed:', error);
+            }
+        }
+
+        // Update UI after processing
+        function updateUI(data) {
+            statsCard.style.display = 'block';
+            document.getElementById('statSections').textContent = data.n_sections || '-';
+            document.getElementById('statTranscripts').textContent = formatNumber(data.n_transcripts || 0);
+            document.getElementById('statCells').textContent = formatNumber(data.n_cells || 0);
+
+            // Fetch additional stats
+            fetch(`/api/session/${SESSION_ID}/data/stats`)
+                .then(r => r.json())
+                .then(stats => {
+                    if (stats.n_niches) {
+                        document.getElementById('statNiches').textContent = stats.n_niches;
+                    }
+                });
+        }
+
+        // Visualization tabs
+        vizTabs.addEventListener('click', (e) => {
+            if (e.target.classList.contains('viz-tab')) {
+                // Update active tab
+                document.querySelectorAll('.viz-tab').forEach(tab => tab.classList.remove('active'));
+                e.target.classList.add('active');
+
+                currentViz = e.target.dataset.viz;
+                updateToolbar();
+
+                if (hasData) {
+                    loadVisualization(currentViz);
+                }
+            }
+        });
+
+        // Update toolbar based on visualization type
+        function updateToolbar() {
+            geneSearch.style.display = currentViz === 'gene' ? 'flex' : 'none';
+
+            // Update color options based on viz type
+            colorBy.innerHTML = '';
+            if (currentViz === 'transcripts_3d') {
+                colorBy.innerHTML = `
+                    <option value="section_index">Section</option>
+                    <option value="gene_name">Gene</option>
+                `;
+            } else if (currentViz === 'cells_3d') {
+                colorBy.innerHTML = `
+                    <option value="niche_3d">Niche</option>
+                    <option value="section_index">Section</option>
+                    <option value="total_counts">Total Counts</option>
+                `;
+            }
+        }
+
+        // Load visualization
+        async function loadVisualization(vizType) {
+            emptyState.style.display = 'none';
+
+            // Show loading state
+            vizPlot.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100%;"><div class="spinner"></div></div>';
+
+            try {
+                let url = `/api/session/${SESSION_ID}/visualization/${vizType}`;
+                const params = new URLSearchParams();
+
+                if (vizType === 'transcripts_3d' || vizType === 'cells_3d') {
+                    params.append('max_points', maxPoints.value);
+                    if (vizType === 'cells_3d') {
+                        params.append('color_by', colorBy.value);
+                    }
+                }
+
+                if (vizType === 'gene') {
+                    const gene = geneInput.value.trim();
+                    if (!gene) {
+                        vizPlot.innerHTML = '<div class="empty-state"><h3>Enter a gene name</h3><p>Type a gene name and click Search to visualize its expression.</p></div>';
+                        return;
+                    }
+                    params.append('gene', gene);
+                }
+
+                if (params.toString()) {
+                    url += '?' + params.toString();
+                }
+
+                const response = await fetch(url);
+                const plotData = await response.json();
+
+                if (response.ok && plotData.data) {
+                    Plotly.newPlot('vizPlot', plotData.data, plotData.layout, {
+                        responsive: true,
+                        displayModeBar: true,
+                        modeBarButtonsToRemove: ['lasso2d', 'select2d']
+                    });
+                } else {
+                    throw new Error(plotData.error || 'Failed to load visualization');
+                }
+            } catch (error) {
+                vizPlot.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${error.message}</p></div>`;
+            }
+        }
+
+        // Color by change
+        colorBy.addEventListener('change', () => {
+            if (hasData) {
+                loadVisualization(currentViz);
+            }
+        });
+
+        // Max points change
+        maxPoints.addEventListener('change', () => {
+            if (hasData) {
+                loadVisualization(currentViz);
+            }
+        });
+
+        // Gene search
+        btnSearchGene.addEventListener('click', () => {
+            if (hasData && geneInput.value.trim()) {
+                loadVisualization('gene');
+            }
+        });
+
+        geneInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && hasData && geneInput.value.trim()) {
+                loadVisualization('gene');
+            }
+        });
+
+        // Export results
+        btnExport.addEventListener('click', async () => {
+            try {
+                const response = await fetch(`/api/session/${SESSION_ID}/export/parquet`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(`Results saved: ${data.files.length} files`, 'success');
+
+                    // Show file paths
+                    alert('Exported files:\n\n' + data.files.join('\n'));
+                } else {
+                    showToast(data.error, 'error');
+                }
+            } catch (error) {
+                showToast('Export failed: ' + error.message, 'error');
+            }
+        });
+
+        // Initialize
+        updateToolbar();
+    </script>
+</body>
+</html>
