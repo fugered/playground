@@ -3,27 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>G4X 3D Reconstruction - Web Interface</title>
+    <title>G4X 3D Reconstruction - Immersive Visualization</title>
 
     <!-- Plotly.js for 3D visualization -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 
+    <!-- Three.js for advanced effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --primary: #4f46e5;
-            --primary-dark: #4338ca;
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.5);
             --secondary: #10b981;
             --accent: #f59e0b;
-            --background: #f8fafc;
-            --surface: #ffffff;
-            --text: #1e293b;
-            --text-light: #64748b;
-            --border: #e2e8f0;
+            --accent-pink: #ec4899;
+            --accent-cyan: #06b6d4;
+            --background: #0f0f1a;
+            --surface: #1a1a2e;
+            --surface-light: #252542;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #2d2d4a;
             --error: #ef4444;
             --success: #22c55e;
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --gradient-3: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --gradient-cosmic: linear-gradient(135deg, #0f0f1a 0%, #1a1a3e 50%, #2d1b4e 100%);
         }
 
         * {
@@ -37,166 +47,233 @@
             background: var(--background);
             color: var(--text);
             min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: var(--gradient-cosmic);
+            overflow: hidden;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(236, 72, 153, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 40%, rgba(6, 182, 212, 0.05) 0%, transparent 40%);
+            animation: bgFloat 20s ease-in-out infinite;
+        }
+
+        @keyframes bgFloat {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(2%, 2%) rotate(1deg); }
+            66% { transform: translate(-1%, 1%) rotate(-1deg); }
         }
 
         /* Header */
         header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            color: white;
-            padding: 1rem 2rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background: rgba(26, 26, 46, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1800px;
+            margin: 0 auto;
         }
 
         header h1 {
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
+            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
-        header h1 span {
-            font-size: 0.75rem;
-            background: rgba(255,255,255,0.2);
-            padding: 0.25rem 0.5rem;
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--gradient-1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px var(--primary-glow);
+        }
+
+        .logo-icon svg {
+            width: 20px;
+            height: 20px;
+            color: white;
+        }
+
+        .header-badge {
+            font-size: 0.65rem;
+            background: var(--gradient-2);
+            padding: 0.2rem 0.5rem;
             border-radius: 4px;
-            font-weight: 400;
+            font-weight: 500;
+            color: white;
+            -webkit-text-fill-color: white;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.5rem;
         }
 
         /* Main Layout */
         .container {
             display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 1.5rem;
-            padding: 1.5rem;
+            grid-template-columns: 320px 1fr;
+            gap: 1rem;
+            padding: 1rem;
             max-width: 1800px;
             margin: 0 auto;
-            min-height: calc(100vh - 80px);
+            min-height: calc(100vh - 60px);
         }
 
         /* Sidebar */
         .sidebar {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.75rem;
         }
 
         .card {
-            background: var(--surface);
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            padding: 1.25rem;
+            background: rgba(26, 26, 46, 0.6);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            padding: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(99, 102, 241, 0.3);
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.1);
         }
 
         .card-title {
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             font-weight: 600;
             color: var(--text);
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .card-title svg {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             color: var(--primary);
         }
 
         /* Upload Zone */
         .upload-zone {
             border: 2px dashed var(--border);
-            border-radius: 8px;
-            padding: 2rem 1rem;
+            border-radius: 12px;
+            padding: 1.5rem 1rem;
             text-align: center;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
             cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-zone::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--gradient-1);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .upload-zone:hover::before, .upload-zone.dragover::before {
+            opacity: 0.1;
         }
 
         .upload-zone:hover, .upload-zone.dragover {
             border-color: var(--primary);
-            background: rgba(79, 70, 229, 0.05);
+            transform: scale(1.02);
         }
 
         .upload-zone svg {
-            width: 48px;
-            height: 48px;
-            color: var(--text-light);
-            margin-bottom: 1rem;
+            width: 40px;
+            height: 40px;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            position: relative;
         }
 
         .upload-zone p {
-            color: var(--text-light);
-            font-size: 0.875rem;
-        }
-
-        .upload-zone .hint {
-            font-size: 0.75rem;
-            margin-top: 0.5rem;
-        }
-
-        /* File Input */
-        #fileInput {
-            display: none;
-        }
-
-        /* Section List */
-        .section-list {
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .section-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem;
-            background: var(--background);
-            border-radius: 6px;
-            margin-bottom: 0.5rem;
+            color: var(--text-muted);
             font-size: 0.8rem;
+            position: relative;
         }
 
-        .section-item .name {
-            font-weight: 500;
-        }
-
-        .section-item .count {
-            color: var(--text-light);
-        }
-
-        /* Parameters Form */
+        /* Form Elements */
         .form-group {
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
         }
 
         .form-group label {
             display: block;
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             font-weight: 500;
             margin-bottom: 0.25rem;
-            color: var(--text);
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .form-group input, .form-group select {
             width: 100%;
             padding: 0.5rem 0.75rem;
+            background: var(--surface-light);
             border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 0.875rem;
-            transition: border-color 0.2s;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: var(--text);
+            transition: all 0.2s;
         }
 
         .form-group input:focus, .form-group select:focus {
             outline: none;
             border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
         }
 
-        .form-group .hint {
-            font-size: 0.7rem;
-            color: var(--text-light);
-            margin-top: 0.25rem;
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
         }
 
         /* Buttons */
@@ -205,162 +282,244 @@
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
-            padding: 0.625rem 1rem;
-            border-radius: 8px;
-            font-size: 0.875rem;
-            font-weight: 500;
+            padding: 0.6rem 1rem;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
             cursor: pointer;
             border: none;
-            transition: all 0.2s;
-            width: 100%;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(rgba(255,255,255,0.1), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .btn:hover::before {
+            opacity: 1;
         }
 
         .btn-primary {
-            background: var(--primary);
+            background: var(--gradient-1);
             color: white;
+            box-shadow: 0 4px 15px var(--primary-glow);
         }
 
         .btn-primary:hover:not(:disabled) {
-            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px var(--primary-glow);
         }
 
         .btn-secondary {
-            background: var(--secondary);
+            background: var(--gradient-3);
             color: white;
         }
 
-        .btn-secondary:hover:not(:disabled) {
-            background: #059669;
-        }
-
-        .btn-outline {
+        .btn-ghost {
             background: transparent;
             border: 1px solid var(--border);
             color: var(--text);
         }
 
-        .btn-outline:hover:not(:disabled) {
-            background: var(--background);
+        .btn-ghost:hover:not(:disabled) {
+            background: var(--surface-light);
+            border-color: var(--primary);
         }
 
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none !important;
         }
 
         .btn-group {
             display: flex;
             gap: 0.5rem;
-            margin-top: 1rem;
         }
 
         .btn-group .btn {
             flex: 1;
         }
 
-        /* Progress Bar */
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border-radius: 8px;
+        }
+
+        /* Progress */
         .progress-container {
-            margin-top: 1rem;
+            margin-top: 0.75rem;
         }
 
         .progress-bar {
-            height: 8px;
-            background: var(--border);
-            border-radius: 4px;
+            height: 6px;
+            background: var(--surface-light);
+            border-radius: 3px;
             overflow: hidden;
         }
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--secondary));
-            border-radius: 4px;
-            transition: width 0.3s;
+            background: var(--gradient-1);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
         }
 
         .progress-text {
-            font-size: 0.75rem;
-            color: var(--text-light);
+            font-size: 0.7rem;
+            color: var(--text-muted);
             margin-top: 0.5rem;
             text-align: center;
+            font-family: 'JetBrains Mono', monospace;
         }
 
-        /* Stats */
+        /* Stats Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 0.75rem;
+            gap: 0.5rem;
         }
 
         .stat-item {
-            background: var(--background);
+            background: var(--surface-light);
             padding: 0.75rem;
-            border-radius: 8px;
+            border-radius: 10px;
             text-align: center;
+            border: 1px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .stat-item:hover {
+            border-color: var(--primary);
+            transform: scale(1.05);
         }
 
         .stat-value {
             font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--primary);
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-family: 'JetBrains Mono', monospace;
         }
 
         .stat-label {
-            font-size: 0.7rem;
-            color: var(--text-light);
+            font-size: 0.65rem;
+            color: var(--text-muted);
             margin-top: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        /* Main Content Area */
+        /* Main Content */
         .main-content {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 0;
+            min-height: 0;
         }
 
-        /* Visualization Tabs */
+        /* Visualization Header */
+        .viz-header {
+            background: rgba(26, 26, 46, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 16px 16px 0 0;
+            padding: 0.75rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
         .viz-tabs {
             display: flex;
-            gap: 0.5rem;
-            padding: 1rem;
-            background: var(--surface);
-            border-radius: 12px 12px 0 0;
-            border-bottom: 1px solid var(--border);
+            gap: 0.25rem;
         }
 
         .viz-tab {
             padding: 0.5rem 1rem;
-            border-radius: 6px;
-            font-size: 0.875rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
             font-weight: 500;
             cursor: pointer;
             border: none;
             background: transparent;
-            color: var(--text-light);
-            transition: all 0.2s;
+            color: var(--text-muted);
+            transition: all 0.3s;
+            position: relative;
         }
 
         .viz-tab:hover {
-            background: var(--background);
             color: var(--text);
+            background: var(--surface-light);
         }
 
         .viz-tab.active {
-            background: var(--primary);
             color: white;
+            background: var(--gradient-1);
+            box-shadow: 0 2px 10px var(--primary-glow);
+        }
+
+        .viz-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .viz-controls select {
+            padding: 0.4rem 0.6rem;
+            background: var(--surface-light);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: var(--text);
         }
 
         /* Visualization Container */
         .viz-container {
-            background: var(--surface);
-            border-radius: 0 0 12px 12px;
+            background: rgba(15, 15, 26, 0.9);
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 16px 16px;
             flex: 1;
             min-height: 500px;
             display: flex;
             flex-direction: column;
+            position: relative;
+            overflow: hidden;
         }
 
+        /* Toolbar */
         .viz-toolbar {
-            padding: 0.75rem 1rem;
+            padding: 0.5rem 1rem;
+            background: rgba(26, 26, 46, 0.5);
             border-bottom: 1px solid var(--border);
             display: flex;
             gap: 1rem;
@@ -368,21 +527,189 @@
             flex-wrap: wrap;
         }
 
-        .viz-toolbar label {
-            font-size: 0.8rem;
-            color: var(--text-light);
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        .viz-toolbar select, .viz-toolbar input {
-            padding: 0.375rem 0.5rem;
+        .toolbar-group label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .toolbar-group select, .toolbar-group input {
+            padding: 0.35rem 0.5rem;
+            background: var(--surface-light);
             border: 1px solid var(--border);
-            border-radius: 4px;
-            font-size: 0.8rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: var(--text);
         }
 
+        .toolbar-divider {
+            width: 1px;
+            height: 24px;
+            background: var(--border);
+        }
+
+        /* 3D Plot Container */
         #vizPlot {
             flex: 1;
             min-height: 450px;
+            position: relative;
+        }
+
+        /* Immersive Mode */
+        .immersive-mode .container {
+            grid-template-columns: 1fr;
+            padding: 0;
+            gap: 0;
+        }
+
+        .immersive-mode .sidebar {
+            display: none;
+        }
+
+        .immersive-mode .viz-container {
+            border-radius: 0;
+            min-height: 100vh;
+        }
+
+        .immersive-mode header {
+            position: fixed;
+            width: 100%;
+            background: rgba(15, 15, 26, 0.5);
+        }
+
+        /* Floating Controls (Immersive Mode) */
+        .floating-controls {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 46, 0.9);
+            backdrop-filter: blur(20px);
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            border: 1px solid var(--border);
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            z-index: 50;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .viz-container:hover .floating-controls {
+            opacity: 1;
+        }
+
+        .floating-controls .btn-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+
+        .floating-controls .btn-icon.active {
+            background: var(--gradient-1);
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        /* Info Panel */
+        .info-panel {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(26, 26, 46, 0.9);
+            backdrop-filter: blur(20px);
+            padding: 1rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            font-size: 0.75rem;
+            min-width: 200px;
+            z-index: 50;
+            opacity: 0;
+            transform: translateX(20px);
+            transition: all 0.3s;
+        }
+
+        .viz-container:hover .info-panel {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .info-panel h4 {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: var(--text-muted);
+        }
+
+        .info-value {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-cyan);
+        }
+
+        /* Color Legend */
+        .color-legend {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background: rgba(26, 26, 46, 0.9);
+            backdrop-filter: blur(20px);
+            padding: 0.75rem;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            font-size: 0.7rem;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 50;
+            opacity: 0;
+            transform: translateX(-20px);
+            transition: all 0.3s;
+        }
+
+        .viz-container:hover .color-legend {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .legend-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.2rem 0;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
         }
 
         /* Empty State */
@@ -392,78 +719,208 @@
             align-items: center;
             justify-content: center;
             height: 100%;
-            color: var(--text-light);
-            padding: 2rem;
+            color: var(--text-muted);
+            padding: 3rem;
             text-align: center;
         }
 
+        .empty-state .icon-container {
+            width: 120px;
+            height: 120px;
+            background: var(--gradient-1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            opacity: 0.3;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.05); opacity: 0.5; }
+        }
+
         .empty-state svg {
-            width: 80px;
-            height: 80px;
-            margin-bottom: 1rem;
-            opacity: 0.5;
+            width: 60px;
+            height: 60px;
+            color: white;
         }
 
         .empty-state h3 {
-            font-size: 1.125rem;
-            font-weight: 500;
+            font-size: 1.25rem;
+            font-weight: 600;
             margin-bottom: 0.5rem;
+            color: var(--text);
         }
 
         .empty-state p {
-            font-size: 0.875rem;
+            font-size: 0.9rem;
+            max-width: 300px;
         }
 
-        /* Loading Spinner */
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--border);
-            border-top-color: var(--primary);
+        /* Loading */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 1.5rem;
+        }
+
+        .loading-orb {
+            width: 80px;
+            height: 80px;
+            position: relative;
+        }
+
+        .loading-orb::before, .loading-orb::after {
+            content: '';
+            position: absolute;
+            inset: 0;
             border-radius: 50%;
+            border: 3px solid transparent;
+        }
+
+        .loading-orb::before {
+            border-top-color: var(--primary);
             animation: spin 1s linear infinite;
+        }
+
+        .loading-orb::after {
+            border-right-color: var(--accent-pink);
+            animation: spin 1.5s linear infinite reverse;
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
 
-        /* Toast Notifications */
+        .loading-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Toast */
         .toast {
             position: fixed;
-            bottom: 1rem;
-            right: 1rem;
+            bottom: 2rem;
+            right: 2rem;
             padding: 1rem 1.5rem;
-            background: var(--text);
-            color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
             display: none;
             z-index: 1000;
+            max-width: 400px;
         }
 
         .toast.show {
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
             animation: slideIn 0.3s ease;
         }
 
-        .toast.error {
-            background: var(--error);
+        .toast.success {
+            border-color: var(--success);
         }
 
-        .toast.success {
+        .toast.error {
+            border-color: var(--error);
+        }
+
+        .toast-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toast.success .toast-icon {
             background: var(--success);
         }
 
+        .toast.error .toast-icon {
+            background: var(--error);
+        }
+
         @keyframes slideIn {
-            from {
-                transform: translateY(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Gene Search */
+        .gene-search {
+            display: flex;
+            gap: 0.5rem;
+            flex: 1;
+            max-width: 300px;
+        }
+
+        .gene-search input {
+            flex: 1;
+            padding: 0.4rem 0.75rem;
+            background: var(--surface-light);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: var(--text);
+        }
+
+        .gene-search button {
+            padding: 0.4rem 0.75rem;
+            background: var(--gradient-1);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        /* Keyboard shortcuts hint */
+        .shortcuts-hint {
+            position: fixed;
+            bottom: 1rem;
+            left: 1rem;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            opacity: 0.5;
+        }
+
+        .shortcuts-hint kbd {
+            background: var(--surface-light);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            margin: 0 0.1rem;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--surface);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
         }
 
         /* Responsive */
@@ -474,42 +931,48 @@
 
             .sidebar {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             }
         }
 
-        /* Gene search */
-        .gene-search {
-            display: flex;
-            gap: 0.5rem;
+        /* Plotly customizations */
+        .js-plotly-plot .plotly .modebar {
+            background: transparent !important;
         }
 
-        .gene-search input {
-            flex: 1;
+        .js-plotly-plot .plotly .modebar-btn path {
+            fill: var(--text-muted) !important;
         }
 
-        .gene-search button {
-            padding: 0.375rem 0.75rem;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8rem;
+        .js-plotly-plot .plotly .modebar-btn:hover path {
+            fill: var(--primary) !important;
         }
     </style>
 </head>
 <body>
+    <div class="bg-animation"></div>
+
     <header>
-        <h1>
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                <polyline points="3.29 7 12 12 20.71 7"></polyline>
-                <line x1="12" y1="22" x2="12" y2="12"></line>
-            </svg>
-            G4X 3D Reconstruction
-            <span>Web Interface</span>
-        </h1>
+        <div class="header-content">
+            <h1>
+                <div class="logo-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                        <line x1="12" y1="22" x2="12" y2="12"></line>
+                    </svg>
+                </div>
+                G4X 3D Reconstruction
+                <span class="header-badge">IMMERSIVE</span>
+            </h1>
+            <div class="header-actions">
+                <button class="btn btn-ghost btn-icon" id="btnFullscreen" title="Fullscreen (F)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
     </header>
 
     <div class="container">
@@ -518,107 +981,110 @@
             <!-- Upload Card -->
             <div class="card">
                 <div class="card-title">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                         <polyline points="17 8 12 3 7 8"></polyline>
                         <line x1="12" y1="3" x2="12" y2="15"></line>
                     </svg>
-                    Import Data
+                    Data Import
                 </div>
 
                 <div class="upload-zone" id="uploadZone">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
                         <path d="M12 12v9"></path>
                         <path d="m16 16-4-4-4 4"></path>
                     </svg>
-                    <p>Drag & drop files here</p>
-                    <p class="hint">or click to browse</p>
-                    <p class="hint">CSV, Parquet, or ZIP files</p>
+                    <p>Drop files here or click to browse</p>
                 </div>
-                <input type="file" id="fileInput" multiple accept=".csv,.csv.gz,.parquet,.zip">
+                <input type="file" id="fileInput" multiple accept=".csv,.csv.gz,.parquet,.zip" style="display:none">
 
-                <div class="form-group" style="margin-top: 1rem;">
-                    <label>Section Index</label>
-                    <input type="number" id="sectionIndex" value="0" min="0" max="20">
-                    <p class="hint">Which section is this data for?</p>
-                </div>
-
-                <div class="form-group">
-                    <label>File Type</label>
-                    <select id="fileType">
-                        <option value="auto">Auto-detect</option>
-                        <option value="transcript_table">Transcript Table</option>
-                        <option value="cell_metadata">Cell Metadata</option>
-                    </select>
+                <div class="form-row" style="margin-top: 0.75rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Section #</label>
+                        <input type="number" id="sectionIndex" value="0" min="0" max="20">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>File Type</label>
+                        <select id="fileType">
+                            <option value="auto">Auto</option>
+                            <option value="transcript_table">Transcripts</option>
+                            <option value="cell_metadata">Cells</option>
+                        </select>
+                    </div>
                 </div>
 
-                <div class="btn-group">
-                    <button class="btn btn-outline" id="btnDemo">Load Demo</button>
-                    <button class="btn btn-outline" id="btnReset">Reset</button>
+                <div class="btn-group" style="margin-top: 0.75rem;">
+                    <button class="btn btn-secondary" id="btnDemo">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        Demo
+                    </button>
+                    <button class="btn btn-ghost" id="btnReset">Reset</button>
                 </div>
             </div>
 
             <!-- Parameters Card -->
             <div class="card">
                 <div class="card-title">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"></circle>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                     </svg>
-                    Processing Parameters
+                    Processing
                 </div>
 
-                <div class="form-group">
-                    <label>Section Thickness (um)</label>
-                    <input type="number" id="sectionThickness" value="5.0" min="0.1" max="100" step="0.1">
-                    <p class="hint">Physical thickness of each section</p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Thickness (um)</label>
+                        <input type="number" id="sectionThickness" value="5.0" min="0.1" max="100" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label>Pixel Size (um)</label>
+                        <input type="number" id="pixelSize" value="0.5" min="0.01" max="10" step="0.01">
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Pixel Size (um)</label>
-                    <input type="number" id="pixelSize" value="0.5" min="0.01" max="10" step="0.01">
-                    <p class="hint">Physical size per pixel</p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Alignment</label>
+                        <select id="alignmentMethod">
+                            <option value="centroid">Centroid</option>
+                            <option value="icp">ICP</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Neighbors</label>
+                        <input type="number" id="nNeighbors" value="30" min="5" max="100">
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Alignment Method</label>
-                    <select id="alignmentMethod">
-                        <option value="centroid">Centroid</option>
-                        <option value="icp">ICP (Iterative Closest Point)</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Niche Neighbors</label>
-                    <input type="number" id="nNeighbors" value="30" min="5" max="100">
-                    <p class="hint">K-nearest neighbors for niche detection</p>
-                </div>
-
-                <button class="btn btn-primary" id="btnProcess" disabled>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                <button class="btn btn-primary" id="btnProcess" disabled style="width: 100%; margin-top: 0.5rem;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
                     </svg>
-                    Run 3D Reconstruction
+                    Build 3D Volume
                 </button>
 
                 <div class="progress-container" id="progressContainer" style="display: none;">
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill" style="width: 0%"></div>
                     </div>
-                    <p class="progress-text" id="progressText">Processing...</p>
+                    <p class="progress-text" id="progressText">Initializing...</p>
                 </div>
             </div>
 
             <!-- Stats Card -->
             <div class="card" id="statsCard" style="display: none;">
                 <div class="card-title">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="20" x2="18" y2="10"></line>
-                        <line x1="12" y1="20" x2="12" y2="4"></line>
-                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 20V10"></path>
+                        <path d="M18 20V4"></path>
+                        <path d="M6 20v-4"></path>
                     </svg>
-                    Results Summary
+                    Statistics
                 </div>
 
                 <div class="stats-grid">
@@ -640,137 +1106,275 @@
                     </div>
                 </div>
 
-                <button class="btn btn-secondary" id="btnExport" style="margin-top: 1rem;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <button class="btn btn-ghost" id="btnExport" style="width: 100%; margin-top: 0.75rem;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                         <polyline points="7 10 12 15 17 10"></polyline>
                         <line x1="12" y1="15" x2="12" y2="3"></line>
                     </svg>
-                    Export Results
+                    Export Data
                 </button>
             </div>
         </aside>
 
-        <!-- Main Visualization Area -->
+        <!-- Main Visualization -->
         <main class="main-content">
-            <div class="viz-tabs" id="vizTabs">
-                <button class="viz-tab active" data-viz="transcripts_3d">3D Transcripts</button>
-                <button class="viz-tab" data-viz="cells_3d">3D Cells</button>
-                <button class="viz-tab" data-viz="niches">Niches</button>
-                <button class="viz-tab" data-viz="sections">Sections</button>
-                <button class="viz-tab" data-viz="gene">Gene Expression</button>
+            <div class="viz-header">
+                <div class="viz-tabs" id="vizTabs">
+                    <button class="viz-tab active" data-viz="transcripts_3d">3D Transcripts</button>
+                    <button class="viz-tab" data-viz="cells_3d">3D Cells</button>
+                    <button class="viz-tab" data-viz="niches">Niches</button>
+                    <button class="viz-tab" data-viz="sections">Sections</button>
+                    <button class="viz-tab" data-viz="gene">Gene</button>
+                </div>
+                <div class="viz-controls">
+                    <button class="btn btn-ghost btn-icon" id="btnImmersive" title="Immersive Mode (I)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21"></line>
+                            <line x1="12" y1="17" x2="12" y2="21"></line>
+                        </svg>
+                    </button>
+                </div>
             </div>
 
-            <div class="viz-container">
+            <div class="viz-container" id="vizContainer">
                 <div class="viz-toolbar" id="vizToolbar">
-                    <div>
-                        <label>Color by: </label>
+                    <div class="toolbar-group">
+                        <label>Color:</label>
                         <select id="colorBy">
                             <option value="section_index">Section</option>
                             <option value="gene_name">Gene</option>
                         </select>
                     </div>
-                    <div>
-                        <label>Max Points: </label>
+                    <div class="toolbar-divider"></div>
+                    <div class="toolbar-group">
+                        <label>Points:</label>
                         <select id="maxPoints">
-                            <option value="10000">10,000</option>
-                            <option value="50000" selected>50,000</option>
-                            <option value="100000">100,000</option>
+                            <option value="25000">25K</option>
+                            <option value="50000" selected>50K</option>
+                            <option value="100000">100K</option>
+                            <option value="200000">200K</option>
                         </select>
                     </div>
+                    <div class="toolbar-divider"></div>
+                    <div class="toolbar-group">
+                        <label>Style:</label>
+                        <select id="pointStyle">
+                            <option value="scatter">Scatter</option>
+                            <option value="glow">Glow</option>
+                            <option value="density">Density</option>
+                        </select>
+                    </div>
+                    <div class="toolbar-divider"></div>
+                    <div class="toolbar-group">
+                        <button class="btn btn-ghost btn-icon" id="btnRotate" title="Auto-Rotate (R)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                                <path d="M21 3v5h-5"></path>
+                            </svg>
+                        </button>
+                        <button class="btn btn-ghost btn-icon" id="btnResetCamera" title="Reset View (Home)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="toolbar-divider" id="geneSearchDivider" style="display: none;"></div>
                     <div class="gene-search" id="geneSearch" style="display: none;">
-                        <input type="text" id="geneInput" placeholder="Enter gene name (e.g., CD3E)">
+                        <input type="text" id="geneInput" placeholder="Gene name (e.g., CD3E, GAPDH)">
                         <button id="btnSearchGene">Search</button>
                     </div>
                 </div>
 
                 <div id="vizPlot">
                     <div class="empty-state" id="emptyState">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                            <polyline points="3.29 7 12 12 20.71 7"></polyline>
-                            <line x1="12" y1="22" x2="12" y2="12"></line>
-                        </svg>
-                        <h3>No Data to Display</h3>
-                        <p>Upload section data or load demo data to get started.</p>
+                        <div class="icon-container">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                                <line x1="12" y1="22" x2="12" y2="12"></line>
+                            </svg>
+                        </div>
+                        <h3>Ready for 3D Exploration</h3>
+                        <p>Upload your G4X section data or click Demo to start visualizing spatial transcriptomics in 3D.</p>
                     </div>
+                </div>
+
+                <!-- Floating Controls -->
+                <div class="floating-controls" id="floatingControls">
+                    <button class="btn btn-ghost btn-icon" id="btnFloatRotate" title="Auto-Rotate">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                        </svg>
+                    </button>
+                    <button class="btn btn-ghost btn-icon" id="btnFloatZoomIn" title="Zoom In">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            <line x1="11" y1="8" x2="11" y2="14"></line>
+                            <line x1="8" y1="11" x2="14" y2="11"></line>
+                        </svg>
+                    </button>
+                    <button class="btn btn-ghost btn-icon" id="btnFloatZoomOut" title="Zoom Out">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            <line x1="8" y1="11" x2="14" y2="11"></line>
+                        </svg>
+                    </button>
+                    <div class="toolbar-divider" style="height: 20px;"></div>
+                    <button class="btn btn-ghost btn-icon" id="btnFloatScreenshot" title="Screenshot">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Info Panel -->
+                <div class="info-panel" id="infoPanel">
+                    <h4>Volume Info</h4>
+                    <div class="info-row">
+                        <span class="info-label">Points</span>
+                        <span class="info-value" id="infoPoints">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">X Range</span>
+                        <span class="info-value" id="infoX">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Y Range</span>
+                        <span class="info-value" id="infoY">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Z Range</span>
+                        <span class="info-value" id="infoZ">-</span>
+                    </div>
+                </div>
+
+                <!-- Color Legend -->
+                <div class="color-legend" id="colorLegend" style="display: none;">
+                    <div class="legend-title">Legend</div>
+                    <div id="legendItems"></div>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- Toast Notification -->
-    <div class="toast" id="toast"></div>
+    <!-- Keyboard Shortcuts -->
+    <div class="shortcuts-hint">
+        <kbd>R</kbd> Rotate <kbd>F</kbd> Fullscreen <kbd>I</kbd> Immersive <kbd>Home</kbd> Reset
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <div class="toast-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        </div>
+        <span id="toastMessage"></span>
+    </div>
 
     <script>
-        // Session management
+        // ============================================================
+        // G4X 3D Visualization - Immersive Experience
+        // ============================================================
+
         const SESSION_ID = '{{ session_id }}';
         let hasData = false;
         let currentViz = 'transcripts_3d';
-        let pollInterval = null;
+        let isRotating = false;
+        let rotationInterval = null;
+        let currentPlotData = null;
+
+        // Color palettes
+        const PALETTES = {
+            cosmic: ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6'],
+            neon: ['#00ff87', '#60efff', '#ff6b6b', '#feca57', '#ff9ff3', '#54a0ff', '#5f27cd', '#00d2d3', '#ff9f43', '#ee5a24'],
+            plasma: ['#0d0887', '#46039f', '#7201a8', '#9c179e', '#bd3786', '#d8576b', '#ed7953', '#fb9f3a', '#fdca26', '#f0f921'],
+            viridis: ['#440154', '#482878', '#3e4a89', '#31688e', '#26828e', '#1f9e89', '#35b779', '#6ece58', '#b5de2b', '#fde725']
+        };
+
+        let currentPalette = PALETTES.cosmic;
 
         // DOM Elements
-        const uploadZone = document.getElementById('uploadZone');
-        const fileInput = document.getElementById('fileInput');
-        const btnDemo = document.getElementById('btnDemo');
-        const btnReset = document.getElementById('btnReset');
-        const btnProcess = document.getElementById('btnProcess');
-        const btnExport = document.getElementById('btnExport');
-        const progressContainer = document.getElementById('progressContainer');
-        const progressFill = document.getElementById('progressFill');
-        const progressText = document.getElementById('progressText');
-        const statsCard = document.getElementById('statsCard');
-        const vizTabs = document.getElementById('vizTabs');
-        const vizPlot = document.getElementById('vizPlot');
-        const emptyState = document.getElementById('emptyState');
-        const toast = document.getElementById('toast');
-        const colorBy = document.getElementById('colorBy');
-        const maxPoints = document.getElementById('maxPoints');
-        const geneSearch = document.getElementById('geneSearch');
-        const geneInput = document.getElementById('geneInput');
-        const btnSearchGene = document.getElementById('btnSearchGene');
+        const elements = {
+            uploadZone: document.getElementById('uploadZone'),
+            fileInput: document.getElementById('fileInput'),
+            btnDemo: document.getElementById('btnDemo'),
+            btnReset: document.getElementById('btnReset'),
+            btnProcess: document.getElementById('btnProcess'),
+            btnExport: document.getElementById('btnExport'),
+            progressContainer: document.getElementById('progressContainer'),
+            progressFill: document.getElementById('progressFill'),
+            progressText: document.getElementById('progressText'),
+            statsCard: document.getElementById('statsCard'),
+            vizTabs: document.getElementById('vizTabs'),
+            vizPlot: document.getElementById('vizPlot'),
+            vizContainer: document.getElementById('vizContainer'),
+            emptyState: document.getElementById('emptyState'),
+            toast: document.getElementById('toast'),
+            toastMessage: document.getElementById('toastMessage'),
+            colorBy: document.getElementById('colorBy'),
+            maxPoints: document.getElementById('maxPoints'),
+            pointStyle: document.getElementById('pointStyle'),
+            geneSearch: document.getElementById('geneSearch'),
+            geneSearchDivider: document.getElementById('geneSearchDivider'),
+            geneInput: document.getElementById('geneInput'),
+            btnSearchGene: document.getElementById('btnSearchGene'),
+            btnRotate: document.getElementById('btnRotate'),
+            btnFloatRotate: document.getElementById('btnFloatRotate'),
+            btnResetCamera: document.getElementById('btnResetCamera'),
+            btnImmersive: document.getElementById('btnImmersive'),
+            btnFullscreen: document.getElementById('btnFullscreen'),
+            infoPanel: document.getElementById('infoPanel'),
+            colorLegend: document.getElementById('colorLegend'),
+            legendItems: document.getElementById('legendItems')
+        };
 
-        // Toast notification
+        // ============================================================
+        // Utility Functions
+        // ============================================================
+
         function showToast(message, type = 'info') {
-            toast.textContent = message;
-            toast.className = 'toast show ' + type;
-            setTimeout(() => {
-                toast.className = 'toast';
-            }, 3000);
+            elements.toastMessage.textContent = message;
+            elements.toast.className = 'toast show ' + type;
+            setTimeout(() => elements.toast.className = 'toast', 3000);
         }
 
-        // Format number with commas
         function formatNumber(num) {
-            if (num >= 1000000) {
-                return (num / 1000000).toFixed(1) + 'M';
-            } else if (num >= 1000) {
-                return (num / 1000).toFixed(1) + 'K';
-            }
+            if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
             return num.toString();
         }
 
-        // File upload handling
-        uploadZone.addEventListener('click', () => fileInput.click());
+        // ============================================================
+        // File Upload
+        // ============================================================
 
-        uploadZone.addEventListener('dragover', (e) => {
+        elements.uploadZone.addEventListener('click', () => elements.fileInput.click());
+
+        elements.uploadZone.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadZone.classList.add('dragover');
+            elements.uploadZone.classList.add('dragover');
         });
 
-        uploadZone.addEventListener('dragleave', () => {
-            uploadZone.classList.remove('dragover');
+        elements.uploadZone.addEventListener('dragleave', () => {
+            elements.uploadZone.classList.remove('dragover');
         });
 
-        uploadZone.addEventListener('drop', (e) => {
+        elements.uploadZone.addEventListener('drop', (e) => {
             e.preventDefault();
-            uploadZone.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFileUpload(files);
+            elements.uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFileUpload(e.dataTransfer.files);
             }
         });
 
-        fileInput.addEventListener('change', (e) => {
+        elements.fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 handleFileUpload(e.target.files);
             }
@@ -794,11 +1398,8 @@
 
                 if (response.ok) {
                     showToast(data.message, 'success');
-                    btnProcess.disabled = false;
-
-                    // Auto-increment section index for next upload
-                    const sectionIndexInput = document.getElementById('sectionIndex');
-                    sectionIndexInput.value = parseInt(sectionIndexInput.value) + 1;
+                    elements.btnProcess.disabled = false;
+                    document.getElementById('sectionIndex').value = parseInt(document.getElementById('sectionIndex').value) + 1;
                 } else {
                     showToast(data.error, 'error');
                 }
@@ -807,56 +1408,45 @@
             }
         }
 
-        // Demo data loading
-        btnDemo.addEventListener('click', async () => {
-            btnDemo.disabled = true;
-            progressContainer.style.display = 'block';
-            progressFill.style.width = '0%';
-            progressText.textContent = 'Generating demo data...';
+        // ============================================================
+        // Demo Data
+        // ============================================================
+
+        elements.btnDemo.addEventListener('click', async () => {
+            elements.btnDemo.disabled = true;
+            elements.progressContainer.style.display = 'block';
+            elements.progressFill.style.width = '0%';
+            elements.progressText.textContent = 'Generating synthetic tissue...';
 
             try {
-                const response = await fetch(`/api/session/${SESSION_ID}/demo`, {
-                    method: 'POST'
-                });
-
+                const response = await fetch(`/api/session/${SESSION_ID}/demo`, { method: 'POST' });
                 const data = await response.json();
 
                 if (response.ok) {
-                    showToast('Demo data loaded successfully!', 'success');
+                    showToast('Demo data ready!', 'success');
                     hasData = true;
-                    updateUI(data);
-                    loadVisualization(currentViz);
+                    updateStats(data);
+                    await loadVisualization(currentViz);
                 } else {
                     showToast(data.error, 'error');
                 }
             } catch (error) {
-                showToast('Failed to load demo: ' + error.message, 'error');
+                showToast('Failed: ' + error.message, 'error');
             } finally {
-                btnDemo.disabled = false;
-                progressContainer.style.display = 'none';
+                elements.btnDemo.disabled = false;
+                elements.progressContainer.style.display = 'none';
             }
         });
 
-        // Reset session
-        btnReset.addEventListener('click', async () => {
-            if (!confirm('Are you sure you want to reset? All data will be cleared.')) {
-                return;
-            }
+        // ============================================================
+        // Processing
+        // ============================================================
 
-            try {
-                await fetch(`/api/session/${SESSION_ID}/reset`, { method: 'POST' });
-                location.reload();
-            } catch (error) {
-                showToast('Reset failed: ' + error.message, 'error');
-            }
-        });
-
-        // Process data
-        btnProcess.addEventListener('click', async () => {
-            btnProcess.disabled = true;
-            progressContainer.style.display = 'block';
-            progressFill.style.width = '0%';
-            progressText.textContent = 'Starting processing...';
+        elements.btnProcess.addEventListener('click', async () => {
+            elements.btnProcess.disabled = true;
+            elements.progressContainer.style.display = 'block';
+            elements.progressFill.style.width = '0%';
+            elements.progressText.textContent = 'Starting reconstruction...';
 
             try {
                 const response = await fetch(`/api/session/${SESSION_ID}/process`, {
@@ -873,49 +1463,45 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    showToast('Processing complete!', 'success');
+                    showToast('3D volume ready!', 'success');
                     hasData = true;
-                    updateUI(data);
-                    loadVisualization(currentViz);
+                    updateStats(data);
+                    await loadVisualization(currentViz);
                 } else {
                     showToast(data.error, 'error');
                 }
             } catch (error) {
                 showToast('Processing failed: ' + error.message, 'error');
             } finally {
-                btnProcess.disabled = false;
-                progressContainer.style.display = 'none';
+                elements.btnProcess.disabled = false;
+                elements.progressContainer.style.display = 'none';
             }
         });
 
-        // Poll for status during processing
-        async function pollStatus() {
+        // ============================================================
+        // Reset
+        // ============================================================
+
+        elements.btnReset.addEventListener('click', async () => {
+            if (!confirm('Clear all data and reset?')) return;
             try {
-                const response = await fetch(`/api/session/${SESSION_ID}/status`);
-                const status = await response.json();
-
-                progressFill.style.width = status.progress + '%';
-                progressText.textContent = status.message;
-
-                if (status.status === 'complete' || status.status === 'error') {
-                    if (pollInterval) {
-                        clearInterval(pollInterval);
-                        pollInterval = null;
-                    }
-                }
+                await fetch(`/api/session/${SESSION_ID}/reset`, { method: 'POST' });
+                location.reload();
             } catch (error) {
-                console.error('Status poll failed:', error);
+                showToast('Reset failed', 'error');
             }
-        }
+        });
 
-        // Update UI after processing
-        function updateUI(data) {
-            statsCard.style.display = 'block';
+        // ============================================================
+        // Stats Update
+        // ============================================================
+
+        function updateStats(data) {
+            elements.statsCard.style.display = 'block';
             document.getElementById('statSections').textContent = data.n_sections || '-';
             document.getElementById('statTranscripts').textContent = formatNumber(data.n_transcripts || 0);
             document.getElementById('statCells').textContent = formatNumber(data.n_cells || 0);
 
-            // Fetch additional stats
             fetch(`/api/session/${SESSION_ID}/data/stats`)
                 .then(r => r.json())
                 .then(stats => {
@@ -925,137 +1511,456 @@
                 });
         }
 
-        // Visualization tabs
-        vizTabs.addEventListener('click', (e) => {
+        // ============================================================
+        // Visualization Tabs
+        // ============================================================
+
+        elements.vizTabs.addEventListener('click', (e) => {
             if (e.target.classList.contains('viz-tab')) {
-                // Update active tab
                 document.querySelectorAll('.viz-tab').forEach(tab => tab.classList.remove('active'));
                 e.target.classList.add('active');
-
                 currentViz = e.target.dataset.viz;
                 updateToolbar();
-
-                if (hasData) {
-                    loadVisualization(currentViz);
-                }
+                if (hasData) loadVisualization(currentViz);
             }
         });
 
-        // Update toolbar based on visualization type
         function updateToolbar() {
-            geneSearch.style.display = currentViz === 'gene' ? 'flex' : 'none';
+            const isGene = currentViz === 'gene';
+            elements.geneSearch.style.display = isGene ? 'flex' : 'none';
+            elements.geneSearchDivider.style.display = isGene ? 'block' : 'none';
 
-            // Update color options based on viz type
-            colorBy.innerHTML = '';
+            elements.colorBy.innerHTML = '';
             if (currentViz === 'transcripts_3d') {
-                colorBy.innerHTML = `
+                elements.colorBy.innerHTML = `
                     <option value="section_index">Section</option>
                     <option value="gene_name">Gene</option>
                 `;
             } else if (currentViz === 'cells_3d') {
-                colorBy.innerHTML = `
+                elements.colorBy.innerHTML = `
                     <option value="niche_3d">Niche</option>
                     <option value="section_index">Section</option>
-                    <option value="total_counts">Total Counts</option>
+                    <option value="total_counts">Counts</option>
                 `;
             }
         }
 
-        // Load visualization
-        async function loadVisualization(vizType) {
-            emptyState.style.display = 'none';
+        // ============================================================
+        // 3D Visualization - The Magic Happens Here
+        // ============================================================
 
-            // Show loading state
-            vizPlot.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100%;"><div class="spinner"></div></div>';
+        async function loadVisualization(vizType) {
+            elements.emptyState.style.display = 'none';
+
+            // Show loading
+            elements.vizPlot.innerHTML = `
+                <div class="loading-container">
+                    <div class="loading-orb"></div>
+                    <div class="loading-text">Rendering 3D volume...</div>
+                </div>
+            `;
 
             try {
                 let url = `/api/session/${SESSION_ID}/visualization/${vizType}`;
                 const params = new URLSearchParams();
+                params.append('max_points', elements.maxPoints.value);
 
-                if (vizType === 'transcripts_3d' || vizType === 'cells_3d') {
-                    params.append('max_points', maxPoints.value);
-                    if (vizType === 'cells_3d') {
-                        params.append('color_by', colorBy.value);
-                    }
+                if (vizType === 'cells_3d') {
+                    params.append('color_by', elements.colorBy.value);
                 }
 
                 if (vizType === 'gene') {
-                    const gene = geneInput.value.trim();
+                    const gene = elements.geneInput.value.trim();
                     if (!gene) {
-                        vizPlot.innerHTML = '<div class="empty-state"><h3>Enter a gene name</h3><p>Type a gene name and click Search to visualize its expression.</p></div>';
+                        elements.vizPlot.innerHTML = `
+                            <div class="empty-state">
+                                <div class="icon-container">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                    </svg>
+                                </div>
+                                <h3>Search for a Gene</h3>
+                                <p>Enter a gene symbol (e.g., CD3E, GAPDH, EPCAM) to visualize its spatial expression pattern.</p>
+                            </div>
+                        `;
                         return;
                     }
                     params.append('gene', gene);
                 }
 
-                if (params.toString()) {
-                    url += '?' + params.toString();
-                }
+                url += '?' + params.toString();
 
                 const response = await fetch(url);
                 const plotData = await response.json();
 
                 if (response.ok && plotData.data) {
-                    Plotly.newPlot('vizPlot', plotData.data, plotData.layout, {
-                        responsive: true,
-                        displayModeBar: true,
-                        modeBarButtonsToRemove: ['lasso2d', 'select2d']
-                    });
+                    currentPlotData = plotData;
+                    await renderPlot(plotData);
+                    updateInfoPanel(plotData);
+                    updateLegend(plotData);
                 } else {
                     throw new Error(plotData.error || 'Failed to load visualization');
                 }
             } catch (error) {
-                vizPlot.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${error.message}</p></div>`;
+                elements.vizPlot.innerHTML = `
+                    <div class="empty-state">
+                        <h3>Error</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
             }
         }
 
-        // Color by change
-        colorBy.addEventListener('change', () => {
-            if (hasData) {
-                loadVisualization(currentViz);
+        async function renderPlot(plotData) {
+            const style = elements.pointStyle.value;
+
+            // Enhance the plot data for immersive experience
+            const enhancedData = plotData.data.map((trace, i) => {
+                const enhanced = { ...trace };
+
+                // Apply color palette
+                if (trace.marker) {
+                    enhanced.marker = { ...trace.marker };
+
+                    if (style === 'glow') {
+                        // Glowing effect with larger points and opacity
+                        enhanced.marker.size = (trace.marker.size || 3) * 1.5;
+                        enhanced.marker.opacity = 0.8;
+                        enhanced.marker.line = { width: 0 };
+                    } else if (style === 'density') {
+                        // Smaller points for density visualization
+                        enhanced.marker.size = Math.max(1, (trace.marker.size || 3) * 0.5);
+                        enhanced.marker.opacity = 0.4;
+                    }
+
+                    // Use cosmic palette colors
+                    if (!trace.marker.color || typeof trace.marker.color === 'string') {
+                        enhanced.marker.color = currentPalette[i % currentPalette.length];
+                    }
+                }
+
+                return enhanced;
+            });
+
+            // Enhanced layout for immersive experience
+            const enhancedLayout = {
+                ...plotData.layout,
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: {
+                    family: 'Inter, sans-serif',
+                    color: '#94a3b8'
+                },
+                scene: {
+                    ...plotData.layout?.scene,
+                    bgcolor: 'rgba(0,0,0,0)',
+                    xaxis: {
+                        ...plotData.layout?.scene?.xaxis,
+                        backgroundcolor: 'rgba(15, 15, 26, 0.8)',
+                        gridcolor: 'rgba(99, 102, 241, 0.1)',
+                        showbackground: true,
+                        zerolinecolor: 'rgba(99, 102, 241, 0.3)',
+                        title: { font: { color: '#94a3b8' } },
+                        tickfont: { color: '#64748b' }
+                    },
+                    yaxis: {
+                        ...plotData.layout?.scene?.yaxis,
+                        backgroundcolor: 'rgba(15, 15, 26, 0.8)',
+                        gridcolor: 'rgba(236, 72, 153, 0.1)',
+                        showbackground: true,
+                        zerolinecolor: 'rgba(236, 72, 153, 0.3)',
+                        title: { font: { color: '#94a3b8' } },
+                        tickfont: { color: '#64748b' }
+                    },
+                    zaxis: {
+                        ...plotData.layout?.scene?.zaxis,
+                        backgroundcolor: 'rgba(15, 15, 26, 0.8)',
+                        gridcolor: 'rgba(6, 182, 212, 0.1)',
+                        showbackground: true,
+                        zerolinecolor: 'rgba(6, 182, 212, 0.3)',
+                        title: { font: { color: '#94a3b8' } },
+                        tickfont: { color: '#64748b' }
+                    },
+                    camera: {
+                        eye: { x: 1.5, y: 1.5, z: 1.2 },
+                        up: { x: 0, y: 0, z: 1 }
+                    },
+                    aspectmode: 'data'
+                },
+                legend: {
+                    ...plotData.layout?.legend,
+                    bgcolor: 'rgba(26, 26, 46, 0.8)',
+                    bordercolor: 'rgba(99, 102, 241, 0.3)',
+                    borderwidth: 1,
+                    font: { color: '#e2e8f0' }
+                },
+                margin: { l: 0, r: 0, t: 30, b: 0 },
+                title: {
+                    text: plotData.layout?.title?.text || '',
+                    font: { color: '#e2e8f0', size: 16 },
+                    x: 0.5
+                }
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['lasso2d', 'select2d', 'sendDataToCloud'],
+                displaylogo: false,
+                toImageButtonOptions: {
+                    format: 'png',
+                    filename: 'g4x_3d_visualization',
+                    height: 1920,
+                    width: 1920,
+                    scale: 2
+                }
+            };
+
+            await Plotly.newPlot('vizPlot', enhancedData, enhancedLayout, config);
+
+            // Start rotation if enabled
+            if (isRotating) {
+                startRotation();
+            }
+        }
+
+        function updateInfoPanel(plotData) {
+            let totalPoints = 0;
+            let xMin = Infinity, xMax = -Infinity;
+            let yMin = Infinity, yMax = -Infinity;
+            let zMin = Infinity, zMax = -Infinity;
+
+            plotData.data.forEach(trace => {
+                if (trace.x) {
+                    totalPoints += trace.x.length;
+                    xMin = Math.min(xMin, Math.min(...trace.x));
+                    xMax = Math.max(xMax, Math.max(...trace.x));
+                }
+                if (trace.y) {
+                    yMin = Math.min(yMin, Math.min(...trace.y));
+                    yMax = Math.max(yMax, Math.max(...trace.y));
+                }
+                if (trace.z) {
+                    zMin = Math.min(zMin, Math.min(...trace.z));
+                    zMax = Math.max(zMax, Math.max(...trace.z));
+                }
+            });
+
+            document.getElementById('infoPoints').textContent = formatNumber(totalPoints);
+            document.getElementById('infoX').textContent = `${xMin.toFixed(0)} - ${xMax.toFixed(0)}`;
+            document.getElementById('infoY').textContent = `${yMin.toFixed(0)} - ${yMax.toFixed(0)}`;
+            document.getElementById('infoZ').textContent = `${zMin.toFixed(1)} - ${zMax.toFixed(1)}`;
+        }
+
+        function updateLegend(plotData) {
+            const traces = plotData.data;
+            if (traces.length <= 1 || traces.length > 15) {
+                elements.colorLegend.style.display = 'none';
+                return;
+            }
+
+            elements.colorLegend.style.display = 'block';
+            elements.legendItems.innerHTML = '';
+
+            traces.forEach((trace, i) => {
+                if (!trace.name) return;
+                const color = trace.marker?.color || currentPalette[i % currentPalette.length];
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+                item.innerHTML = `
+                    <div class="legend-color" style="background: ${color}"></div>
+                    <span>${trace.name}</span>
+                `;
+                elements.legendItems.appendChild(item);
+            });
+        }
+
+        // ============================================================
+        // Camera Controls & Rotation
+        // ============================================================
+
+        function startRotation() {
+            if (rotationInterval) clearInterval(rotationInterval);
+
+            let angle = 0;
+            rotationInterval = setInterval(() => {
+                angle += 0.5;
+                const radians = angle * Math.PI / 180;
+                const eye = {
+                    x: 2 * Math.cos(radians),
+                    y: 2 * Math.sin(radians),
+                    z: 1.2
+                };
+
+                Plotly.relayout('vizPlot', {
+                    'scene.camera.eye': eye
+                });
+            }, 50);
+        }
+
+        function stopRotation() {
+            if (rotationInterval) {
+                clearInterval(rotationInterval);
+                rotationInterval = null;
+            }
+        }
+
+        function toggleRotation() {
+            isRotating = !isRotating;
+            elements.btnRotate.classList.toggle('active', isRotating);
+            elements.btnFloatRotate.classList.toggle('active', isRotating);
+
+            if (isRotating) {
+                startRotation();
+            } else {
+                stopRotation();
+            }
+        }
+
+        elements.btnRotate.addEventListener('click', toggleRotation);
+        elements.btnFloatRotate.addEventListener('click', toggleRotation);
+
+        elements.btnResetCamera.addEventListener('click', () => {
+            Plotly.relayout('vizPlot', {
+                'scene.camera': {
+                    eye: { x: 1.5, y: 1.5, z: 1.2 },
+                    up: { x: 0, y: 0, z: 1 }
+                }
+            });
+        });
+
+        // Zoom controls
+        document.getElementById('btnFloatZoomIn').addEventListener('click', () => {
+            const plotDiv = document.getElementById('vizPlot');
+            if (plotDiv._fullLayout?.scene?.camera?.eye) {
+                const eye = plotDiv._fullLayout.scene.camera.eye;
+                Plotly.relayout('vizPlot', {
+                    'scene.camera.eye': {
+                        x: eye.x * 0.8,
+                        y: eye.y * 0.8,
+                        z: eye.z * 0.8
+                    }
+                });
             }
         });
 
-        // Max points change
-        maxPoints.addEventListener('change', () => {
-            if (hasData) {
-                loadVisualization(currentViz);
+        document.getElementById('btnFloatZoomOut').addEventListener('click', () => {
+            const plotDiv = document.getElementById('vizPlot');
+            if (plotDiv._fullLayout?.scene?.camera?.eye) {
+                const eye = plotDiv._fullLayout.scene.camera.eye;
+                Plotly.relayout('vizPlot', {
+                    'scene.camera.eye': {
+                        x: eye.x * 1.2,
+                        y: eye.y * 1.2,
+                        z: eye.z * 1.2
+                    }
+                });
             }
         });
 
-        // Gene search
-        btnSearchGene.addEventListener('click', () => {
-            if (hasData && geneInput.value.trim()) {
+        // Screenshot
+        document.getElementById('btnFloatScreenshot').addEventListener('click', () => {
+            Plotly.downloadImage('vizPlot', {
+                format: 'png',
+                width: 1920,
+                height: 1080,
+                filename: 'g4x_3d_visualization'
+            });
+            showToast('Screenshot saved!', 'success');
+        });
+
+        // ============================================================
+        // Immersive & Fullscreen Modes
+        // ============================================================
+
+        elements.btnImmersive.addEventListener('click', () => {
+            document.body.classList.toggle('immersive-mode');
+        });
+
+        elements.btnFullscreen.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        });
+
+        // ============================================================
+        // Toolbar Events
+        // ============================================================
+
+        elements.colorBy.addEventListener('change', () => hasData && loadVisualization(currentViz));
+        elements.maxPoints.addEventListener('change', () => hasData && loadVisualization(currentViz));
+        elements.pointStyle.addEventListener('change', () => {
+            if (hasData && currentPlotData) {
+                renderPlot(currentPlotData);
+            }
+        });
+
+        elements.btnSearchGene.addEventListener('click', () => {
+            if (hasData && elements.geneInput.value.trim()) {
                 loadVisualization('gene');
             }
         });
 
-        geneInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && hasData && geneInput.value.trim()) {
+        elements.geneInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && hasData && elements.geneInput.value.trim()) {
                 loadVisualization('gene');
             }
         });
 
-        // Export results
-        btnExport.addEventListener('click', async () => {
+        // ============================================================
+        // Export
+        // ============================================================
+
+        elements.btnExport.addEventListener('click', async () => {
             try {
                 const response = await fetch(`/api/session/${SESSION_ID}/export/parquet`);
                 const data = await response.json();
-
                 if (response.ok) {
-                    showToast(`Results saved: ${data.files.length} files`, 'success');
-
-                    // Show file paths
-                    alert('Exported files:\n\n' + data.files.join('\n'));
+                    showToast(`Exported ${data.files.length} files`, 'success');
                 } else {
                     showToast(data.error, 'error');
                 }
             } catch (error) {
-                showToast('Export failed: ' + error.message, 'error');
+                showToast('Export failed', 'error');
             }
         });
 
+        // ============================================================
+        // Keyboard Shortcuts
+        // ============================================================
+
+        document.addEventListener('keydown', (e) => {
+            // Ignore if typing in input
+            if (e.target.tagName === 'INPUT') return;
+
+            switch(e.key.toLowerCase()) {
+                case 'r':
+                    toggleRotation();
+                    break;
+                case 'f':
+                    elements.btnFullscreen.click();
+                    break;
+                case 'i':
+                    elements.btnImmersive.click();
+                    break;
+                case 'home':
+                    elements.btnResetCamera.click();
+                    break;
+                case '1': case '2': case '3': case '4': case '5':
+                    const tabs = document.querySelectorAll('.viz-tab');
+                    const idx = parseInt(e.key) - 1;
+                    if (tabs[idx]) tabs[idx].click();
+                    break;
+            }
+        });
+
+        // ============================================================
         // Initialize
+        // ============================================================
+
         updateToolbar();
     </script>
 </body>
